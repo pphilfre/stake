@@ -31,7 +31,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white">Connect to CryptoVault</h2>
+          <h2 className="text-2xl font-bold text-white">Connect to 🥩 Steak</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white transition-colors"
