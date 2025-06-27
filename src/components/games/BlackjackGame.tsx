@@ -21,7 +21,7 @@ export const BlackjackGame: React.FC = () => {
   const [canDoubleDown, setCanDoubleDown] = useState(false);
   const [gameHistory, setGameHistory] = useState<Array<{result: string, playerScore: number, dealerScore: number}>>([]);
   
-  const { balance, updateBalance } = useWallet();
+  const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
   const { updateStats, generateProvablyFairSeed } = useGame();
 
   const suits = ['♠', '♥', '♦', '♣'];
@@ -62,6 +62,7 @@ export const BlackjackGame: React.FC = () => {
   };
 
   const dealInitialCards = () => {
+    const balance = getBalance();
     if (parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0) return;
 
     const deck = createDeck();
@@ -121,6 +122,7 @@ export const BlackjackGame: React.FC = () => {
   };
 
   const doubleDown = () => {
+    const balance = getBalance();
     if (parseFloat(betAmount) > balance) return;
     
     updateBalance(-parseFloat(betAmount));
@@ -177,7 +179,7 @@ export const BlackjackGame: React.FC = () => {
   };
 
   const getCardColor = (suit: string) => {
-    return suit === '♥' || suit === '♦' ? 'text-red-400' : 'text-white';
+    return suit === '♥' || suit === '♦' ? 'text-red-500' : 'text-black';
   };
 
   const getResultMessage = () => {
@@ -197,105 +199,168 @@ export const BlackjackGame: React.FC = () => {
     }
   };
 
+  const formatBalance = (amount: number) => {
+    if (selectedCurrency === 'BTC') return amount.toFixed(8);
+    if (selectedCurrency === 'ETH') return amount.toFixed(6);
+    return amount.toFixed(2);
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Game Area */}
         <div className="lg:col-span-2 space-y-6">
           {/* Game Table */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
-            {/* Dealer Cards */}
-            <div className="mb-8">
-              <h3 className="text-xl font-semibold text-white mb-4">
-                Dealer {gameState === 'finished' ? `(${calculateScore(dealerCards)})` : `(${dealerScore})`}
-              </h3>
-              <div className="flex space-x-2">
-                {dealerCards.map((card, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.2 }}
-                    className="w-16 h-24 bg-white rounded-lg flex items-center justify-center border-2 border-gray-300"
-                  >
-                    {gameState === 'playing' && index === 1 ? (
-                      <div className="w-full h-full bg-blue-600 rounded-lg flex items-center justify-center">
-                        <div className="w-8 h-8 bg-white rounded-full"></div>
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold ${getCardColor(card.suit)}`}>
-                          {card.rank}
-                        </div>
-                        <div className={`text-xl ${getCardColor(card.suit)}`}>
-                          {card.suit}
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </div>
+          <div className="bg-gradient-to-br from-green-800/30 to-green-900/30 backdrop-blur-sm rounded-2xl p-8 border border-green-600/30 relative overflow-hidden">
+            {/* Table felt pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="felt" width="60" height="60" patternUnits="userSpaceOnUse">
+                    <circle cx="30" cy="30" r="2" fill="white" opacity="0.3"/>
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#felt)" />
+              </svg>
             </div>
-
-            {/* Player Cards */}
-            <div>
-              <h3 className="text-xl font-semibold text-white mb-4">
-                You ({playerScore})
-              </h3>
-              <div className="flex space-x-2">
-                {playerCards.map((card, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.2 }}
-                    className="w-16 h-24 bg-white rounded-lg flex items-center justify-center border-2 border-gray-300"
-                  >
-                    <div className="text-center">
-                      <div className={`text-2xl font-bold ${getCardColor(card.suit)}`}>
-                        {card.rank}
-                      </div>
-                      <div className={`text-xl ${getCardColor(card.suit)}`}>
-                        {card.suit}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* Result */}
-            {result && (
-              <div className="text-center mt-6">
-                <div className={`text-3xl font-bold ${
-                  ['win', 'dealer-bust', 'blackjack'].includes(result) ? 'text-green-400' : 
-                  result === 'push' ? 'text-yellow-400' : 'text-red-400'
-                }`}>
-                  {getResultMessage()}
+            
+            <div className="relative z-10">
+              {/* Dealer Cards */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-white mb-4">
+                  Dealer {gameState === 'finished' ? `(${calculateScore(dealerCards)})` : `(${dealerScore})`}
+                </h3>
+                <div className="flex space-x-2">
+                  {dealerCards.map((card, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: -20, rotateY: 180 }}
+                      animate={{ opacity: 1, y: 0, rotateY: 0 }}
+                      transition={{ delay: index * 0.2, duration: 0.6 }}
+                      className="relative"
+                    >
+                      {gameState === 'playing' && index === 1 ? (
+                        <div className="w-16 h-24 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center border-2 border-blue-500 shadow-lg">
+                          <div className="w-8 h-8 bg-white rounded-full opacity-80"></div>
+                        </div>
+                      ) : (
+                        <div className="w-16 h-24 bg-white rounded-lg flex items-center justify-center border-2 border-gray-300 shadow-lg relative overflow-hidden">
+                          {/* Card background pattern */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white"></div>
+                          <div className="text-center relative z-10">
+                            <div className={`text-2xl font-bold ${getCardColor(card.suit)}`}>
+                              {card.rank}
+                            </div>
+                            <div className={`text-xl ${getCardColor(card.suit)}`}>
+                              {card.suit}
+                            </div>
+                          </div>
+                          {/* Corner decorations */}
+                          <div className={`absolute top-1 left-1 text-xs font-bold ${getCardColor(card.suit)}`}>
+                            {card.rank}
+                          </div>
+                          <div className={`absolute bottom-1 right-1 text-xs font-bold transform rotate-180 ${getCardColor(card.suit)}`}>
+                            {card.rank}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
                 </div>
               </div>
-            )}
+
+              {/* Player Cards */}
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-4">
+                  You ({playerScore})
+                </h3>
+                <div className="flex space-x-2">
+                  {playerCards.map((card, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 20, rotateY: 180 }}
+                      animate={{ opacity: 1, y: 0, rotateY: 0 }}
+                      transition={{ delay: index * 0.2, duration: 0.6 }}
+                      className="relative"
+                    >
+                      <div className="w-16 h-24 bg-white rounded-lg flex items-center justify-center border-2 border-gray-300 shadow-lg relative overflow-hidden">
+                        {/* Card background pattern */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white"></div>
+                        <div className="text-center relative z-10">
+                          <div className={`text-2xl font-bold ${getCardColor(card.suit)}`}>
+                            {card.rank}
+                          </div>
+                          <div className={`text-xl ${getCardColor(card.suit)}`}>
+                            {card.suit}
+                          </div>
+                        </div>
+                        {/* Corner decorations */}
+                        <div className={`absolute top-1 left-1 text-xs font-bold ${getCardColor(card.suit)}`}>
+                          {card.rank}
+                        </div>
+                        <div className={`absolute bottom-1 right-1 text-xs font-bold transform rotate-180 ${getCardColor(card.suit)}`}>
+                          {card.rank}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Result */}
+              {result && (
+                <div className="text-center mt-6">
+                  <div className={`text-3xl font-bold ${
+                    ['win', 'dealer-bust', 'blackjack'].includes(result) ? 'text-green-400' : 
+                    result === 'push' ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
+                    {getResultMessage()}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Game Controls */}
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
             {gameState === 'betting' && (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Bet Amount
-                  </label>
-                  <input
-                    type="number"
-                    value={betAmount}
-                    onChange={(e) => setBetAmount(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
-                    placeholder="Enter bet amount"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Currency
+                    </label>
+                    <select
+                      value={selectedCurrency}
+                      onChange={(e) => switchCurrency(e.target.value)}
+                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-400"
+                    >
+                      {currencies.map(currency => (
+                        <option key={currency.symbol} value={currency.symbol} className="bg-slate-800">
+                          {currency.symbol} - {currency.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Bet Amount
+                    </label>
+                    <input
+                      type="number"
+                      value={betAmount}
+                      onChange={(e) => setBetAmount(e.target.value)}
+                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
+                      placeholder="Enter bet amount"
+                      step={selectedCurrency === 'BTC' ? '0.00000001' : selectedCurrency === 'ETH' ? '0.000001' : '0.01'}
+                    />
+                  </div>
                 </div>
+                
                 <button
                   onClick={dealInitialCards}
-                  disabled={parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0}
+                  disabled={parseFloat(betAmount) > getBalance() || parseFloat(betAmount) <= 0}
                   className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 rounded-lg transition-all flex items-center justify-center space-x-2"
                 >
                   <Play className="w-5 h-5" />
@@ -324,7 +389,7 @@ export const BlackjackGame: React.FC = () => {
                 {canDoubleDown && (
                   <button
                     onClick={doubleDown}
-                    disabled={parseFloat(betAmount) > balance}
+                    disabled={parseFloat(betAmount) > getBalance()}
                     className="col-span-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-all"
                   >
                     Double Down
@@ -352,11 +417,11 @@ export const BlackjackGame: React.FC = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-300">Current Bet</span>
-                <span className="text-white font-semibold">${betAmount}</span>
+                <span className="text-white font-semibold">{betAmount} {selectedCurrency}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Balance</span>
-                <span className="text-white font-semibold">${balance.toFixed(2)}</span>
+                <span className="text-white font-semibold">{formatBalance(getBalance())} {selectedCurrency}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Blackjack Pays</span>

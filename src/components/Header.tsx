@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Wallet, User, Menu, X, Coins, TrendingUp } from 'lucide-react';
+import { Wallet, User, Menu, X, Coins, TrendingUp, Bitcoin, Feather as Ethereum, DollarSign } from 'lucide-react';
 import { useWallet } from '../contexts/WalletContext';
 import { AuthModal } from './AuthModal';
 import { WalletModal } from './WalletModal';
@@ -9,13 +9,29 @@ export const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-  const { isConnected, balance } = useWallet();
+  const { isConnected, currencies, selectedCurrency, getBalance } = useWallet();
   const location = useLocation();
 
   const navigation = [
     { name: 'Casino', href: '/casino', icon: Coins },
     { name: 'Sportsbook', href: '/sportsbook', icon: TrendingUp },
   ];
+
+  const getCurrencyIcon = () => {
+    switch (selectedCurrency) {
+      case 'BTC': return Bitcoin;
+      case 'ETH': return Ethereum;
+      default: return DollarSign;
+    }
+  };
+
+  const formatBalance = (amount: number) => {
+    if (selectedCurrency === 'BTC') return amount.toFixed(8);
+    if (selectedCurrency === 'ETH') return amount.toFixed(6);
+    return amount.toFixed(2);
+  };
+
+  const CurrencyIcon = getCurrencyIcon();
 
   return (
     <>
@@ -55,8 +71,8 @@ export const Header: React.FC = () => {
                     onClick={() => setIsWalletModalOpen(true)}
                     className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
                   >
-                    <Wallet className="w-4 h-4" />
-                    <span>${balance.toFixed(2)}</span>
+                    <CurrencyIcon className="w-4 h-4" />
+                    <span>{formatBalance(getBalance())} {selectedCurrency}</span>
                   </button>
                   <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />

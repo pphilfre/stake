@@ -23,12 +23,13 @@ export const MinesGame: React.FC = () => {
   const [showWinAnimation, setShowWinAnimation] = useState(false);
   const [showLoseAnimation, setShowLoseAnimation] = useState(false);
   
-  const { balance, updateBalance } = useWallet();
+  const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
   const { updateStats, generateProvablyFairSeed } = useGame();
 
   const gridSize = 25; // 5x5 grid
 
   const initializeGame = () => {
+    const balance = getBalance();
     if (parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0) return;
 
     const newCells: Cell[] = Array.from({ length: gridSize }, (_, index) => ({
@@ -169,7 +170,7 @@ export const MinesGame: React.FC = () => {
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          className="w-full h-full bg-gradient-to-br from-red-600 to-red-800 rounded-lg border-2 border-red-500 flex items-center justify-center"
+          className="w-full h-full bg-gradient-to-br from-red-600 to-red-800 rounded-lg border-2 border-red-500 flex items-center justify-center relative overflow-hidden"
         >
           <motion.div
             initial={{ rotate: 0 }}
@@ -178,6 +179,14 @@ export const MinesGame: React.FC = () => {
           >
             <Bomb className="w-8 h-8 text-white" />
           </motion.div>
+          
+          {/* Explosion effect */}
+          <motion.div
+            className="absolute inset-0 bg-orange-500 rounded-lg"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [0, 1.5, 0], opacity: [0, 0.8, 0] }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          />
         </motion.div>
       );
     }
@@ -234,6 +243,12 @@ export const MinesGame: React.FC = () => {
     );
   };
 
+  const formatBalance = (amount: number) => {
+    if (selectedCurrency === 'BTC') return amount.toFixed(8);
+    if (selectedCurrency === 'ETH') return amount.toFixed(6);
+    return amount.toFixed(2);
+  };
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -251,7 +266,9 @@ export const MinesGame: React.FC = () => {
                 <div className="text-purple-300 text-sm">Multiplier</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-400 mb-1">${(parseFloat(betAmount) * currentMultiplier).toFixed(2)}</div>
+                <div className="text-2xl font-bold text-green-400 mb-1">
+                  {formatBalance(parseFloat(betAmount) * currentMultiplier)} {selectedCurrency}
+                </div>
                 <div className="text-purple-300 text-sm">Potential Win</div>
               </div>
               <div className="text-center">
@@ -300,11 +317,11 @@ export const MinesGame: React.FC = () => {
               ))}
             </div>
 
-            {/* Win Animation */}
+            {/* Win Animation - Higher z-index */}
             <AnimatePresence>
               {showWinAnimation && (
                 <motion.div
-                  className="absolute inset-0 flex items-center justify-center bg-green-500/20 backdrop-blur-sm rounded-2xl"
+                  className="absolute inset-0 flex items-center justify-center bg-green-500/20 backdrop-blur-sm rounded-2xl z-50"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -323,17 +340,19 @@ export const MinesGame: React.FC = () => {
                       🎉
                     </motion.div>
                     <div className="text-4xl font-bold text-green-400 mb-2">YOU WIN!</div>
-                    <div className="text-2xl text-white">${(parseFloat(betAmount) * currentMultiplier).toFixed(2)}</div>
+                    <div className="text-2xl text-white">
+                      {formatBalance(parseFloat(betAmount) * currentMultiplier)} {selectedCurrency}
+                    </div>
                   </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Lose Animation */}
+            {/* Lose Animation - Higher z-index */}
             <AnimatePresence>
               {showLoseAnimation && (
                 <motion.div
-                  className="absolute inset-0 flex items-center justify-center bg-red-500/20 backdrop-blur-sm rounded-2xl"
+                  className="absolute inset-0 flex items-center justify-center bg-red-500/20 backdrop-blur-sm rounded-2xl z-50"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -363,7 +382,24 @@ export const MinesGame: React.FC = () => {
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
             {gameState === 'betting' && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Currency
+                    </label>
+                    <select
+                      value={selectedCurrency}
+                      onChange={(e) => switchCurrency(e.target.value)}
+                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-400"
+                    >
+                      {currencies.map(currency => (
+                        <option key={currency.symbol} value={currency.symbol} className="bg-slate-800">
+                          {currency.symbol} - {currency.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Bet Amount
@@ -374,6 +410,7 @@ export const MinesGame: React.FC = () => {
                       onChange={(e) => setBetAmount(e.target.value)}
                       className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
                       placeholder="Enter bet amount"
+                      step={selectedCurrency === 'BTC' ? '0.00000001' : selectedCurrency === 'ETH' ? '0.000001' : '0.01'}
                     />
                   </div>
                   
@@ -395,7 +432,7 @@ export const MinesGame: React.FC = () => {
 
                 <button
                   onClick={initializeGame}
-                  disabled={parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0}
+                  disabled={parseFloat(betAmount) > getBalance() || parseFloat(betAmount) <= 0}
                   className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 rounded-lg transition-all flex items-center justify-center space-x-2"
                 >
                   <Play className="w-5 h-5" />
@@ -421,7 +458,7 @@ export const MinesGame: React.FC = () => {
                   className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-lg transition-all flex items-center justify-center space-x-2"
                 >
                   <TrendingUp className="w-5 h-5" />
-                  <span>Cash Out ${(parseFloat(betAmount) * currentMultiplier).toFixed(2)}</span>
+                  <span>Cash Out {formatBalance(parseFloat(betAmount) * currentMultiplier)} {selectedCurrency}</span>
                 </button>
               </div>
             )}
@@ -445,11 +482,11 @@ export const MinesGame: React.FC = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-300">Current Bet</span>
-                <span className="text-white font-semibold">${betAmount}</span>
+                <span className="text-white font-semibold">{betAmount} {selectedCurrency}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Balance</span>
-                <span className="text-white font-semibold">${balance.toFixed(2)}</span>
+                <span className="text-white font-semibold">{formatBalance(getBalance())} {selectedCurrency}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Mines</span>

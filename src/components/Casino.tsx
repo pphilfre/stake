@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Dice1, RotateCw, Spade as SuitSpade, Play, Eye, Shield, Zap } from 'lucide-react';
+import { Dice1, RotateCw, Spade as SuitSpade, Play, Eye, Shield, Zap, Circle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { DiceGame } from './games/DiceGame';
 import { RouletteGame } from './games/RouletteGame';
 import { BlackjackGame } from './games/BlackjackGame';
 import { MinesGame } from './games/MinesGame';
+import { PlinkoGame } from './games/PlinkoGame';
 import { ProvablyFairModal } from './ProvablyFairModal';
 
 export const Casino: React.FC = () => {
@@ -20,6 +21,16 @@ export const Casino: React.FC = () => {
       icon: Zap,
       description: 'Find gems while avoiding mines in this thrilling game of risk and reward',
       component: MinesGame,
+      minBet: 0.001,
+      maxBet: 100,
+      featured: true,
+    },
+    {
+      id: 'plinko',
+      name: 'Plinko',
+      icon: Circle,
+      description: 'Drop the ball and watch it bounce through pegs to win big multipliers',
+      component: PlinkoGame,
       minBet: 0.001,
       maxBet: 100,
       featured: true,
@@ -111,75 +122,79 @@ export const Casino: React.FC = () => {
           </div>
         </div>
 
-        {/* Featured Game */}
-        {games.filter(game => game.featured).map((game) => {
-          const Icon = game.icon;
-          return (
-            <motion.div
-              key={game.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-sm rounded-2xl p-8 border border-purple-500/30 mb-12 relative overflow-hidden"
-            >
-              {/* Background Pattern */}
-              <div className="absolute inset-0 opacity-10">
-                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <pattern id="featured-grid" width="60" height="60" patternUnits="userSpaceOnUse">
-                      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" strokeWidth="1"/>
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#featured-grid)" />
-                </svg>
-              </div>
-              
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
-                      <Icon className="w-8 h-8 text-black" />
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xs font-bold px-2 py-1 rounded-full">
-                          FEATURED
-                        </span>
-                        <div className="flex items-center space-x-2 text-green-400">
-                          <Eye className="w-4 h-4" />
-                          <span className="text-sm">Provably Fair</span>
-                        </div>
-                      </div>
-                      <h2 className="text-3xl font-bold text-white">{game.name}</h2>
-                      <p className="text-gray-300 text-lg">{game.description}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedGame(game.id)}
-                    className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-semibold px-8 py-4 rounded-xl transition-all flex items-center space-x-2 text-lg"
-                  >
-                    <Play className="w-5 h-5" />
-                    <span>Play Now</span>
-                  </button>
+        {/* Featured Games */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          {games.filter(game => game.featured).map((game) => {
+            const Icon = game.icon;
+            return (
+              <motion.div
+                key={game.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-sm rounded-2xl p-8 border border-purple-500/30 relative overflow-hidden"
+              >
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-10">
+                  <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <pattern id={`featured-grid-${game.id}`} width="60" height="60" patternUnits="userSpaceOnUse">
+                        <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" strokeWidth="1"/>
+                      </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill={`url(#featured-grid-${game.id})`} />
+                  </svg>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white/10 rounded-lg p-4">
-                    <div className="text-sm text-gray-400 mb-1">Min Bet</div>
-                    <div className="text-xl font-bold text-white">{game.minBet} BTC</div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
+                        <Icon className="w-8 h-8 text-black" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xs font-bold px-2 py-1 rounded-full">
+                            FEATURED
+                          </span>
+                          <div className="flex items-center space-x-2 text-green-400">
+                            <Eye className="w-4 h-4" />
+                            <span className="text-sm">Provably Fair</span>
+                          </div>
+                        </div>
+                        <h2 className="text-3xl font-bold text-white">{game.name}</h2>
+                        <p className="text-gray-300 text-lg">{game.description}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedGame(game.id)}
+                      className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-semibold px-8 py-4 rounded-xl transition-all flex items-center space-x-2 text-lg"
+                    >
+                      <Play className="w-5 h-5" />
+                      <span>Play Now</span>
+                    </button>
                   </div>
-                  <div className="bg-white/10 rounded-lg p-4">
-                    <div className="text-sm text-gray-400 mb-1">Max Bet</div>
-                    <div className="text-xl font-bold text-white">{game.maxBet} BTC</div>
-                  </div>
-                  <div className="bg-white/10 rounded-lg p-4">
-                    <div className="text-sm text-gray-400 mb-1">Max Multiplier</div>
-                    <div className="text-xl font-bold text-yellow-400">24.75x</div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-white/10 rounded-lg p-4">
+                      <div className="text-sm text-gray-400 mb-1">Min Bet</div>
+                      <div className="text-xl font-bold text-white">{game.minBet} BTC</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4">
+                      <div className="text-sm text-gray-400 mb-1">Max Bet</div>
+                      <div className="text-xl font-bold text-white">{game.maxBet} BTC</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4">
+                      <div className="text-sm text-gray-400 mb-1">Max Multiplier</div>
+                      <div className="text-xl font-bold text-yellow-400">
+                        {game.id === 'plinko' ? '420x' : '24.75x'}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          );
-        })}
+              </motion.div>
+            );
+          })}
+        </div>
 
         {/* Games Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
