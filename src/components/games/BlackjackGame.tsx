@@ -3,6 +3,8 @@ import { Play, RotateCw, Plus, Minus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '../../contexts/WalletContext';
 import { useGame } from '../../contexts/GameContext';
+import { useAdmin } from '../../contexts/AdminContext';
+import { AdminButton } from '../AdminButton';
 
 interface Card {
   suit: string;
@@ -23,6 +25,7 @@ export const BlackjackGame: React.FC = () => {
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
   const { updateStats, generateProvablyFairSeed } = useGame();
+  const { gameSettings } = useAdmin();
 
   const suits = ['♠', '♥', '♦', '♣'];
   const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -63,7 +66,18 @@ export const BlackjackGame: React.FC = () => {
 
   const dealInitialCards = () => {
     const balance = getBalance();
+    const currentSettings = gameSettings.blackjack || { minBet: 1, maxBet: 1000, winRate: 48, enabled: true };
+    
+    if (!currentSettings.enabled) {
+      alert('This game is currently disabled.');
+      return;
+    }
+    
     if (parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0) return;
+    if (parseFloat(betAmount) < currentSettings.minBet || parseFloat(betAmount) > currentSettings.maxBet) {
+      alert(`Bet amount must be between ${currentSettings.minBet} and ${currentSettings.maxBet}`);
+      return;
+    }
 
     const deck = createDeck();
     const playerInitial = [deck[0], deck[2]];
@@ -459,6 +473,11 @@ export const BlackjackGame: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Admin Button */}
+      <div className="fixed top-4 right-4">
+        <AdminButton gameId="blackjack" />
       </div>
     </div>
   );

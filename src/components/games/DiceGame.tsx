@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Play, RotateCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { Play } from 'lucide-react';
 import { useWallet } from '../../contexts/WalletContext';
 import { useGame } from '../../contexts/GameContext';
+import { useAdmin } from '../../contexts/AdminContext';
+import { AdminButton } from '../AdminButton';
 
 export const DiceGame: React.FC = () => {
   const [betAmount, setBetAmount] = useState('1');
@@ -12,13 +13,11 @@ export const DiceGame: React.FC = () => {
   const [isRolling, setIsRolling] = useState(false);
   const [lastWin, setLastWin] = useState<boolean | null>(null);
   const [gameHistory, setGameHistory] = useState<Array<{result: number, prediction: string, won: boolean}>>([]);
-  const [diceRotation, setDiceRotation] = useState({ x: 0, y: 0, z: 0 });
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
   const { updateStats, generateProvablyFairSeed } = useGame();
+  const { gameSettings } = useAdmin();
 
-  const diceIcons = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
-  
   const multiplier = prediction === 'over' 
     ? (99 / (100 - rollOver)) 
     : (99 / rollOver);
@@ -27,31 +26,53 @@ export const DiceGame: React.FC = () => {
 
   const rollDice = async () => {
     const balance = getBalance();
+    const currentSettings = gameSettings.dice || { minBet: 1, maxBet: 1000, winRate: 50, enabled: true };
+    
+    if (!currentSettings.enabled) {
+      alert('This game is currently disabled.');
+      return;
+    }
+    
     if (parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0) return;
+    if (parseFloat(betAmount) < currentSettings.minBet || parseFloat(betAmount) > currentSettings.maxBet) {
+      alert(`Bet amount must be between ${currentSettings.minBet} and ${currentSettings.maxBet}`);
+      return;
+    }
 
     setIsRolling(true);
+    setDiceResult(null);
+    setLastWin(null);
     updateBalance(-parseFloat(betAmount));
 
-    // Animate dice rolling
-    const rollAnimation = setInterval(() => {
-      setDiceRotation({
-        x: Math.random() * 360,
-        y: Math.random() * 360,
-        z: Math.random() * 360,
-      });
-    }, 100);
-
     // Generate provably fair result
-    const seed = generateProvablyFairSeed();
-    const roll = Math.floor(Math.random() * 100) + 1;
+    generateProvablyFairSeed();
+    let roll = Math.floor(Math.random() * 100) + 1;
 
-    // Simulate rolling animation
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Apply admin win rate settings
+    const shouldWin = Math.random() * 100 < currentSettings.winRate;
+    const canWin = (prediction === 'over' && rollOver < 100) || (prediction === 'under' && rollOver > 1);
 
-    clearInterval(rollAnimation);
+    if (shouldWin && canWin) {
+        if (prediction === 'over') {
+            roll = Math.floor(Math.random() * (100 - rollOver)) + rollOver + 1;
+        } else { // under
+            roll = Math.floor(Math.random() * (rollOver - 1)) + 1;
+        }
+    } else {
+        if (prediction === 'over') {
+            roll = Math.floor(Math.random() * rollOver) + 1;
+        } else { // under
+            roll = Math.floor(Math.random() * (100 - rollOver + 1)) + rollOver;
+        }
+    }
+    
+    roll = Math.max(1, Math.min(100, roll));
+
+    // Wait for dice animation to complete
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
     setDiceResult(roll);
     setIsRolling(false);
-    setDiceRotation({ x: 0, y: 0, z: 0 });
 
     const won = (prediction === 'over' && roll > rollOver) || (prediction === 'under' && roll < rollOver);
     setLastWin(won);
@@ -65,14 +86,6 @@ export const DiceGame: React.FC = () => {
     setGameHistory(prev => [...prev.slice(-9), { result: roll, prediction: `${prediction} ${rollOver}`, won }]);
   };
 
-  const getDiceIcon = () => {
-    if (diceResult === null) return Dice1;
-    const index = Math.floor((diceResult - 1) / 16.66);
-    return diceIcons[Math.min(index, 5)];
-  };
-
-  const DiceIcon = getDiceIcon();
-
   const formatBalance = (amount: number) => {
     if (selectedCurrency === 'BTC') return amount.toFixed(8);
     if (selectedCurrency === 'ETH') return amount.toFixed(6);
@@ -84,35 +97,14 @@ export const DiceGame: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Game Controls */}
         <div className="lg:col-span-2 space-y-6">
-          {/* 3D Dice Display */}
+          {/* Simple Dice Display */}
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 text-center">
-            <div className="perspective-1000 mb-8">
-              <motion.div
-                className="inline-block"
-                animate={isRolling ? diceRotation : { x: 0, y: 0, z: 0 }}
-                transition={{ duration: 0.1 }}
-                style={{
-                  transformStyle: 'preserve-3d',
-                }}
-              >
-                <div className={`w-24 h-24 mx-auto mb-4 rounded-2xl flex items-center justify-center relative ${
-                  lastWin === true ? 'bg-green-600' : 
-                  lastWin === false ? 'bg-red-600' : 
-                  'bg-gradient-to-r from-yellow-400 to-orange-500'
-                } shadow-2xl`}
-                style={{
-                  transform: `rotateX(${diceRotation.x}deg) rotateY(${diceRotation.y}deg) rotateZ(${diceRotation.z}deg)`,
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.3), inset 0 0 20px rgba(255,255,255,0.1)',
-                }}>
-                  {/* Dice faces */}
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent" />
-                  <DiceIcon className="w-12 h-12 text-white relative z-10" />
-                  
-                  {/* 3D effect edges */}
-                  <div className="absolute -right-2 top-2 w-24 h-20 bg-black/20 rounded-2xl transform skew-y-12 -z-10" />
-                  <div className="absolute -bottom-2 left-2 w-20 h-24 bg-black/20 rounded-2xl transform skew-x-12 -z-10" />
-                </div>
-              </motion.div>
+            <div className="mb-8 h-32 flex items-center justify-center">
+              <div className={`w-24 h-24 bg-white rounded-xl border-2 border-gray-300 flex items-center justify-center text-4xl font-bold text-black transition-all duration-300 ${
+                isRolling ? 'animate-bounce' : ''
+              }`}>
+                {isRolling ? '?' : diceResult || '?'}
+              </div>
             </div>
             
             {diceResult !== null && (
@@ -279,6 +271,11 @@ export const DiceGame: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Admin Button */}
+      <div className="fixed top-4 right-4">
+        <AdminButton gameId="dice" />
       </div>
     </div>
   );

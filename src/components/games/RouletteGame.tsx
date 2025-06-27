@@ -3,6 +3,8 @@ import { Play, RotateCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '../../contexts/WalletContext';
 import { useGame } from '../../contexts/GameContext';
+import { useAdmin } from '../../contexts/AdminContext';
+import { AdminButton } from '../AdminButton';
 
 export const RouletteGame: React.FC = () => {
   const [betAmount, setBetAmount] = useState('1');
@@ -13,9 +15,14 @@ export const RouletteGame: React.FC = () => {
   const [gameHistory, setGameHistory] = useState<number[]>([]);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [ballRotation, setBallRotation] = useState(0);
+  const [isAutoplaying, setIsAutoplaying] = useState(false);
+  const [autoplayRounds, setAutoplayRounds] = useState(10);
+  const [autoplayCount, setAutoplayCount] = useState(0);
+  const [lastBets, setLastBets] = useState<{[key: string]: number}>({});
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
   const { updateStats, generateProvablyFairSeed } = useGame();
+  const { gameSettings } = useAdmin();
 
   const rouletteNumbers = [
     { number: 0, color: 'green' },
@@ -42,6 +49,25 @@ export const RouletteGame: React.FC = () => {
     { name: '19-36', multiplier: 2, color: 'bg-orange-600' },
   ];
 
+  useEffect(() => {
+    if (isAutoplaying && !isSpinning && autoplayCount > 0) {
+      const totalBet = Object.values(lastBets).reduce((sum, bet) => sum + bet, 0);
+      if (getBalance() < totalBet) {
+        setIsAutoplaying(false);
+        return;
+      }
+      setSelectedBets(lastBets);
+    } else if (isAutoplaying && autoplayCount <= 0) {
+      setIsAutoplaying(false);
+    }
+  }, [isAutoplaying, isSpinning, autoplayCount]);
+
+  useEffect(() => {
+    if (isAutoplaying && !isSpinning && Object.keys(selectedBets).length > 0 && autoplayCount > 0) {
+      spin();
+    }
+  }, [isAutoplaying, isSpinning, selectedBets]);
+
   const placeBet = (betType: string) => {
     const amount = parseFloat(betAmount);
     const balance = getBalance();
@@ -66,12 +92,26 @@ export const RouletteGame: React.FC = () => {
     updateBalance(-totalBet);
 
     // Generate provably fair result
-    const seed = generateProvablyFairSeed();
+    generateProvablyFairSeed();
     const spinResult = Math.floor(Math.random() * 37);
 
-    // Calculate final rotations
-    const finalWheelRotation = wheelRotation + 1440 + (spinResult * (360 / 37)); // 4 full rotations + position
-    const finalBallRotation = ballRotation - 2160 - (spinResult * (360 / 37)); // 6 full rotations opposite direction
+    // Find the index of the winning number in our array
+    const winningIndex = rouletteNumbers.findIndex(n => n.number === spinResult);
+    const anglePerSegment = 360 / rouletteNumbers.length;
+    const winningAngle = winningIndex * anglePerSegment;
+
+    // Calculate how much we need to rotate to get the winning number to the top (0 degrees)
+    // We want the winning number to be at the top, so we calculate the angle to get there
+    const currentNormalizedRotation = wheelRotation % 360;
+    const targetAngle = 360 - winningAngle; // Angle to position winning number at top
+    let rotationNeeded = targetAngle - currentNormalizedRotation;
+    
+    // Ensure we always rotate in a positive direction and add multiple full rotations
+    if (rotationNeeded <= 0) rotationNeeded += 360;
+    rotationNeeded += 1440; // Add 4 full rotations for the spinning effect
+
+    const finalWheelRotation = wheelRotation + rotationNeeded;
+    const finalBallRotation = ballRotation - 2160; // 6 full rotations opposite direction
 
     setWheelRotation(finalWheelRotation);
     setBallRotation(finalBallRotation);
@@ -130,6 +170,9 @@ export const RouletteGame: React.FC = () => {
 
     setLastWin(hasWon);
     updateStats(totalBet, hasWon);
+    if (isAutoplaying) {
+      setAutoplayCount(c => c - 1);
+    }
     setGameHistory(prev => [...prev.slice(-9), spinResult]);
     setSelectedBets({});
   };
@@ -154,28 +197,56 @@ export const RouletteGame: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* 3D Roulette Wheel */}
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 text-center">
-            <div className="relative w-80 h-80 mx-auto mb-8">
+            <div className="relative w-96 h-96 mx-auto mb-8">
               {/* Wheel Base */}
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-amber-900 to-amber-700 shadow-2xl">
-                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-amber-800 to-amber-600">
+                <div className="absolute inset-3 rounded-full bg-gradient-to-br from-amber-800 to-amber-600">
+                  
+                  {/* Wheel Segments */}
+                  <div className="absolute inset-6 rounded-full overflow-hidden">
+                    {rouletteNumbers.map((num, index) => {
+                      const angle = 360 / rouletteNumbers.length;
+                      const rotation = index * angle;
+                      return (
+                        <div
+                          key={`segment-${num.number}`}
+                          className={`absolute inset-0 ${
+                            num.color === 'red' ? 'bg-red-700/30' : 
+                            num.color === 'black' ? 'bg-gray-800/30' : 'bg-green-700/30'
+                          }`}
+                          style={{
+                            clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.sin((angle * Math.PI) / 180)}% ${50 - 50 * Math.cos((angle * Math.PI) / 180)}%)`,
+                            transform: `rotate(${rotation}deg)`,
+                            transformOrigin: 'center center',
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
                   {/* Wheel Numbers */}
                   <motion.div
-                    className="absolute inset-4 rounded-full"
+                    className="absolute inset-6 rounded-full"
                     animate={{ rotate: wheelRotation }}
                     transition={{ duration: isSpinning ? 3 : 0, ease: "easeOut" }}
+                    style={{ transformOrigin: 'center center' }}
                   >
                     {rouletteNumbers.map((num, index) => {
                       const angle = (index * 360) / rouletteNumbers.length;
+                      const radius = 140; // Adjusted distance from center for bigger wheel
+                      const x = Math.cos((angle - 90) * Math.PI / 180) * radius;
+                      const y = Math.sin((angle - 90) * Math.PI / 180) * radius;
+                      
                       return (
                         <div
                           key={num.number}
-                          className={`absolute w-8 h-8 flex items-center justify-center text-white text-xs font-bold rounded ${
+                          className={`absolute w-8 h-8 flex items-center justify-center text-white text-sm font-bold rounded-sm ${
                             num.color === 'red' ? 'bg-red-600' : 
                             num.color === 'black' ? 'bg-gray-900' : 'bg-green-600'
                           }`}
                           style={{
-                            transform: `rotate(${angle}deg) translateY(-120px) rotate(-${angle}deg)`,
-                            transformOrigin: 'center 120px',
+                            left: `calc(50% + ${x}px - 16px)`,
+                            top: `calc(50% + ${y}px - 16px)`,
+                            transform: `rotate(${-wheelRotation}deg)`, // Counter-rotate to keep numbers flat
                           }}
                         >
                           {num.number}
@@ -186,30 +257,39 @@ export const RouletteGame: React.FC = () => {
                 </div>
               </div>
 
+              {/* Pointer to indicate winning position */}
+              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-20">
+                <div className="w-0 h-0 border-l-4 border-r-4 border-b-6 border-l-transparent border-r-transparent border-b-yellow-400"></div>
+              </div>
+
               {/* Ball */}
               <motion.div
-                className="absolute top-4 left-1/2 w-4 h-4 bg-white rounded-full shadow-lg z-10"
-                style={{ transformOrigin: '0 150px' }}
+                className="absolute w-4 h-4 bg-white rounded-full shadow-lg z-10"
+                style={{ 
+                  left: 'calc(50% - 8px)',
+                  top: 'calc(50% - 8px - 160px)',
+                  transformOrigin: '8px 160px'
+                }}
                 animate={{ rotate: ballRotation }}
                 transition={{ duration: isSpinning ? 3 : 0, ease: "easeOut" }}
               />
 
               {/* Center Hub */}
-              <div className="absolute top-1/2 left-1/2 w-16 h-16 -mt-8 -ml-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full shadow-lg flex items-center justify-center">
-                <div className="w-8 h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full" />
+              <div className="absolute top-1/2 left-1/2 w-20 h-20 -mt-10 -ml-10 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full shadow-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full" />
               </div>
 
               {/* Wheel Markers */}
               <div className="absolute inset-0">
-                {Array.from({ length: 8 }, (_, i) => (
+                {rouletteNumbers.map((_, i) => (
                   <div
                     key={i}
-                    className="absolute w-1 h-8 bg-yellow-400"
+                    className="absolute w-0.5 h-8 bg-yellow-400/50"
                     style={{
-                      top: '10px',
+                      top: '12px',
                       left: '50%',
-                      transformOrigin: '0 150px',
-                      transform: `translateX(-50%) rotate(${i * 45}deg)`,
+                      transformOrigin: '0 180px',
+                      transform: `translateX(-50%) rotate(${i * (360 / rouletteNumbers.length)}deg)`,
                     }}
                   />
                 ))}
@@ -257,13 +337,14 @@ export const RouletteGame: React.FC = () => {
                   className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
                   placeholder="Enter bet amount"
                   step={selectedCurrency === 'BTC' ? '0.00000001' : selectedCurrency === 'ETH' ? '0.000001' : '0.01'}
+                  disabled={isAutoplaying}
                 />
               </div>
               
               <div className="flex items-end">
                 <button
                   onClick={clearBets}
-                  disabled={isSpinning}
+                  disabled={isSpinning || isAutoplaying}
                   className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-all"
                 >
                   Clear Bets
@@ -271,12 +352,45 @@ export const RouletteGame: React.FC = () => {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Number of Rounds
+                </label>
+                <input
+                  type="number"
+                  value={autoplayRounds}
+                  onChange={(e) => setAutoplayRounds(parseInt(e.target.value))}
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
+                  placeholder="Number of rounds"
+                  disabled={isAutoplaying}
+                />
+              </div>
+              <button
+                onClick={() => {
+                  if (isAutoplaying) {
+                    setIsAutoplaying(false);
+                  } else {
+                    if (Object.keys(selectedBets).length === 0) return;
+                    setLastBets(selectedBets);
+                    setAutoplayCount(autoplayRounds);
+                    setIsAutoplaying(true);
+                  }
+                }}
+                disabled={isSpinning && !isAutoplaying}
+                className={`w-full self-end ${isAutoplaying ? 'bg-red-500 hover:bg-red-600' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center space-x-2`}
+              >
+                <RotateCw className={`w-5 h-5 ${isAutoplaying ? 'animate-spin' : ''}`} />
+                <span>{isAutoplaying ? `Stop Autoplay (${autoplayCount})` : 'Start Autoplay'}</span>
+              </button>
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
               {betTypes.map((bet) => (
                 <button
                   key={bet.name}
                   onClick={() => placeBet(bet.name)}
-                  disabled={isSpinning}
+                  disabled={isSpinning || isAutoplaying}
                   className={`${bet.color} hover:opacity-80 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-all relative`}
                 >
                   <span>{bet.name}</span>
@@ -292,7 +406,7 @@ export const RouletteGame: React.FC = () => {
 
             <button
               onClick={spin}
-              disabled={isSpinning || Object.keys(selectedBets).length === 0}
+              disabled={isSpinning || Object.keys(selectedBets).length === 0 || isAutoplaying}
               className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 rounded-lg transition-all flex items-center justify-center space-x-2"
             >
               <Play className="w-5 h-5" />
@@ -354,6 +468,11 @@ export const RouletteGame: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Admin Button */}
+      <div className="fixed top-4 right-4">
+        <AdminButton gameId="roulette" />
       </div>
     </div>
   );

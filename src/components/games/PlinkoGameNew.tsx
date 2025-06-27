@@ -47,7 +47,7 @@ export const PlinkoGame: React.FC = () => {
     },
     colors: {
       background: 'transparent',
-      pin: '#FFFFFF',
+      pin: '#8B5CF6',
       ball: '#F59E0B'
     }
   };
@@ -72,6 +72,13 @@ export const PlinkoGame: React.FC = () => {
       }
     };
     return multipliers[riskLevel][rows as keyof typeof multipliers[typeof riskLevel]];
+  };
+
+  const getBucketColor = (multiplier: number) => {
+    if (multiplier >= 10) return 'from-red-500 to-red-700';
+    if (multiplier >= 3) return 'from-orange-500 to-orange-700';
+    if (multiplier >= 1) return 'from-green-500 to-green-700';
+    return 'from-gray-500 to-gray-700';
   };
 
   // Initialize physics engine
@@ -175,18 +182,11 @@ export const PlinkoGame: React.FC = () => {
       const bucketX = bucketWidth * index + bucketWidth / 2;
       const bucketY = worldHeight - 100;
       
-      // Use solid colors based on multiplier value
-      let bucketColor = '#6B7280'; // Gray-500 for losing multipliers
-      if (multiplier >= 100) bucketColor = '#DC2626'; // Red-600 for very high multipliers
-      else if (multiplier >= 10) bucketColor = '#EA580C'; // Orange-600 for high multipliers
-      else if (multiplier >= 3) bucketColor = '#D97706'; // Amber-600 for medium-high multipliers
-      else if (multiplier >= 1) bucketColor = '#059669'; // Emerald-600 for winning multipliers
-      
-      const bucket = Bodies.rectangle(bucketX, bucketY, bucketWidth - 2, 30, {
+      const bucket = Bodies.rectangle(bucketX, bucketY, bucketWidth - 2, 20, {
         label: `bucket-${index}-${multiplier}`,
         isStatic: true,
         render: {
-          fillStyle: bucketColor
+          fillStyle: multiplier >= 1 ? '#10B981' : '#EF4444'
         }
       });
       multiplierBodies.push(bucket);
@@ -196,7 +196,7 @@ export const PlinkoGame: React.FC = () => {
     Composite.add(world, [...pins, leftWall, rightWall, floor, ...multiplierBodies]);
 
     // Collision detection
-    Events.on(engineRef.current, 'collisionStart', (event: any) => {
+    Events.on(engineRef.current, 'collisionStart', (event) => {
       const pairs = event.pairs;
       
       for (const pair of pairs) {
@@ -226,6 +226,10 @@ export const PlinkoGame: React.FC = () => {
           setLastResult({ multiplier, bucket: bucketIndex });
           updateStats(betValue, won);
           setGameHistory(prev => [...prev.slice(-9), { multiplier, won }]);
+          
+          setTimeout(() => {
+            setIsDropping(false);
+          }, 500);
         }
       }
     });
@@ -233,7 +237,7 @@ export const PlinkoGame: React.FC = () => {
   }, [rows, riskLevel]);
 
   const addBall = useCallback((ballValue: number) => {
-    if (!engineRef.current) return;
+    if (!engineRef.current || ballsInGame >= 10) return;
 
     const { world } = engineRef.current;
     const { width: worldWidth } = config.world;
@@ -259,7 +263,7 @@ export const PlinkoGame: React.FC = () => {
 
   const dropBall = async () => {
     const balance = getBalance();
-    if (parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0) {
+    if (parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0 || isDropping) {
       return;
     }
 
@@ -268,31 +272,6 @@ export const PlinkoGame: React.FC = () => {
     generateProvablyFairSeed();
     
     addBall(parseFloat(betAmount));
-    
-    // Reset dropping state after a short delay for UI feedback
-    setTimeout(() => {
-      setIsDropping(false);
-    }, 200);
-  };
-
-  const dropMultipleBalls = async (count: number) => {
-    const balance = getBalance();
-    const totalCost = parseFloat(betAmount) * count;
-    
-    if (totalCost > balance || parseFloat(betAmount) <= 0) {
-      return;
-    }
-
-    const maxBalls = Math.min(count, Math.floor(balance / parseFloat(betAmount)));
-    
-    for (let i = 0; i < maxBalls; i++) {
-      updateBalance(-parseFloat(betAmount));
-      generateProvablyFairSeed();
-      
-      setTimeout(() => {
-        addBall(parseFloat(betAmount));
-      }, i * 100); // Stagger the drops slightly
-    }
   };
 
   const formatBalance = (amount: number) => {
@@ -308,34 +287,28 @@ export const PlinkoGame: React.FC = () => {
         <div className="lg:col-span-3 space-y-6">
           {/* Plinko Board */}
           <div className="bg-gradient-to-br from-slate-900/50 to-slate-800/50 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50 relative overflow-hidden">
-            <div className="relative">
-              <div 
-                ref={gameContainerRef}
-                className="mx-auto"
-                style={{ width: config.world.width, height: config.world.height }}
-              />
-              
-              {/* Multiplier Text Overlay */}
-              <div 
-                className="absolute bottom-24 left-1/2 transform -translate-x-1/2 flex"
-                style={{ width: config.world.width }}
-              >
-                {getMultipliers().map((multiplier, index) => (
-                  <div
-                    key={index}
-                    className={`text-center text-xs font-bold text-white flex items-center justify-center ${
-                      lastResult?.bucket === index ? 'text-yellow-300' : ''
-                    }`}
-                    style={{ 
-                      width: `${config.world.width / getMultipliers().length - 2}px`,
-                      height: '30px',
-                      marginLeft: index === 0 ? '1px' : '2px'
-                    }}
-                  >
+            <div 
+              ref={gameContainerRef}
+              className="mx-auto"
+              style={{ width: config.world.width, height: config.world.height }}
+            />
+            
+            {/* Multiplier Labels */}
+            <div className="flex justify-center mt-4">
+              {getMultipliers().map((multiplier, index) => (
+                <div
+                  key={index}
+                  className={`flex-1 text-center py-2 mx-0.5 rounded ${
+                    lastResult?.bucket === index 
+                      ? 'bg-yellow-500 text-black' 
+                      : `bg-gradient-to-b ${getBucketColor(multiplier)} text-white`
+                  }`}
+                >
+                  <div className="text-xs font-bold">
                     {multiplier}x
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
 
             {/* Result Display */}
@@ -415,29 +388,12 @@ export const PlinkoGame: React.FC = () => {
 
               <button
                 onClick={dropBall}
-                disabled={parseFloat(betAmount) > getBalance() || parseFloat(betAmount) <= 0}
+                disabled={isDropping || parseFloat(betAmount) > getBalance() || parseFloat(betAmount) <= 0}
                 className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-3 rounded-lg transition-all flex items-center justify-center space-x-2"
               >
                 <Play className="w-4 h-4" />
                 <span>{isDropping ? 'Dropping...' : 'Drop Ball'}</span>
               </button>
-
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <button
-                  onClick={() => dropMultipleBalls(5)}
-                  disabled={parseFloat(betAmount) * 5 > getBalance() || parseFloat(betAmount) <= 0}
-                  className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition-all text-sm"
-                >
-                  Drop 5
-                </button>
-                <button
-                  onClick={() => dropMultipleBalls(10)}
-                  disabled={parseFloat(betAmount) * 10 > getBalance() || parseFloat(betAmount) <= 0}
-                  className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition-all text-sm"
-                >
-                  Drop 10
-                </button>
-              </div>
             </div>
           </div>
 

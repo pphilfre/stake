@@ -3,6 +3,8 @@ import { Play, RotateCw, Bomb, Gem, Zap, TrendingUp, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '../../contexts/WalletContext';
 import { useGame } from '../../contexts/GameContext';
+import { useAdmin } from '../../contexts/AdminContext';
+import { AdminButton } from '../AdminButton';
 
 interface Cell {
   id: number;
@@ -22,11 +24,58 @@ export const MinesGame: React.FC = () => {
   const [animatingCell, setAnimatingCell] = useState<number | null>(null);
   const [showWinAnimation, setShowWinAnimation] = useState(false);
   const [showLoseAnimation, setShowLoseAnimation] = useState(false);
+  const [isAutoplaying, setIsAutoplaying] = useState(false);
+  const [autoplayBets, setAutoplayBets] = useState(10);
+  const [autoplayCount, setAutoplayCount] = useState(0);
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
   const { updateStats, generateProvablyFairSeed } = useGame();
+  const { gameSettings } = useAdmin();
 
   const gridSize = 25; // 5x5 grid
+
+  useEffect(() => {
+    if (!isAutoplaying) return;
+
+    if (gameState === 'finished') {
+      if (autoplayCount > 1) {
+        setTimeout(() => newGame(), 1000);
+      } else {
+        setIsAutoplaying(false);
+      }
+      return;
+    }
+
+    if (gameState === 'betting') {
+      const balance = getBalance();
+      if (parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0) {
+        setIsAutoplaying(false);
+        return;
+      }
+      initializeGame();
+      return;
+    }
+
+    if (gameState === 'playing') {
+      if (revealedGems === 0) {
+        const availableCells = cells.filter(c => !c.revealed);
+        if (availableCells.length === gridSize) {
+          setTimeout(() => {
+            const randomCell = availableCells[Math.floor(Math.random() * availableCells.length)];
+            revealCell(randomCell.id);
+          }, 500);
+        }
+      } else {
+        setTimeout(() => cashOut(), 500);
+      }
+    }
+  }, [isAutoplaying, gameState, cells, revealedGems, autoplayCount]);
+
+  useEffect(() => {
+    if (gameState === 'finished' && isAutoplaying) {
+      setAutoplayCount(count => count - 1);
+    }
+  }, [gameState, isAutoplaying]);
 
   const initializeGame = () => {
     const balance = getBalance();
@@ -391,6 +440,7 @@ export const MinesGame: React.FC = () => {
                       value={selectedCurrency}
                       onChange={(e) => switchCurrency(e.target.value)}
                       className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-400"
+                      disabled={isAutoplaying}
                     >
                       {currencies.map(currency => (
                         <option key={currency.symbol} value={currency.symbol} className="bg-slate-800">
@@ -411,6 +461,7 @@ export const MinesGame: React.FC = () => {
                       className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
                       placeholder="Enter bet amount"
                       step={selectedCurrency === 'BTC' ? '0.00000001' : selectedCurrency === 'ETH' ? '0.000001' : '0.01'}
+                      disabled={isAutoplaying}
                     />
                   </div>
                   
@@ -422,6 +473,7 @@ export const MinesGame: React.FC = () => {
                       value={mineCount}
                       onChange={(e) => setMineCount(parseInt(e.target.value))}
                       className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-400"
+                      disabled={isAutoplaying}
                     >
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
                         <option key={num} value={num} className="bg-slate-800">{num}</option>
@@ -430,9 +482,39 @@ export const MinesGame: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Number of Bets
+                    </label>
+                    <input
+                        type="number"
+                        value={autoplayBets}
+                        onChange={(e) => setAutoplayBets(parseInt(e.target.value))}
+                        className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
+                        placeholder="Number of bets"
+                        disabled={isAutoplaying}
+                    />
+                  </div>
+                  <button
+                      onClick={() => {
+                          if (isAutoplaying) {
+                              setIsAutoplaying(false);
+                          } else {
+                              setAutoplayCount(autoplayBets);
+                              setIsAutoplaying(true);
+                          }
+                      }}
+                      className={`w-full self-end ${isAutoplaying ? 'bg-red-500 hover:bg-red-600' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center space-x-2`}
+                  >
+                      <RotateCw className={`w-5 h-5 ${isAutoplaying ? 'animate-spin' : ''}`} />
+                      <span>{isAutoplaying ? `Stop Autoplay (${autoplayCount})` : 'Start Autoplay'}</span>
+                  </button>
+                </div>
+
                 <button
                   onClick={initializeGame}
-                  disabled={parseFloat(betAmount) > getBalance() || parseFloat(betAmount) <= 0}
+                  disabled={parseFloat(betAmount) > getBalance() || parseFloat(betAmount) <= 0 || isAutoplaying}
                   className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 rounded-lg transition-all flex items-center justify-center space-x-2"
                 >
                   <Play className="w-5 h-5" />
@@ -543,6 +625,11 @@ export const MinesGame: React.FC = () => {
             </ul>
           </div>
         </div>
+      </div>
+
+      {/* Admin Button */}
+      <div className="fixed top-4 right-4">
+        <AdminButton gameId="mines" />
       </div>
     </div>
   );
