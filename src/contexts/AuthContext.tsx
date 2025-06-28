@@ -105,7 +105,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
         loadProfile(session.user.id)
-        loadGameResults()
       } else {
         setLoading(false)
       }
@@ -119,7 +118,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (session?.user) {
         await loadProfile(session.user.id)
-        await loadGameResults()
       } else {
         setProfile(null)
         setGameResults([])
@@ -129,6 +127,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Load game results whenever user or profile changes
+  useEffect(() => {
+    if (user && profile) {
+      console.log('User and profile available, loading game results...')
+      loadGameResults()
+    }
+  }, [user, profile])
 
   const loadProfile = async (userId: string) => {
     if (!isSupabaseConfigured) return
@@ -194,7 +200,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loadGameResults = async () => {
     if (!user) {
-      console.log('No user, skipping game results load')
+      console.log('No user available for loading game results')
       return
     }
 
