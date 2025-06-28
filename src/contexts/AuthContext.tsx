@@ -129,6 +129,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!isSupabaseConfigured) return
 
     try {
+      // First try to get existing profile
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -138,7 +139,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error && error.code === 'PGRST116') {
         // Profile doesn't exist, create one
         const newProfile = {
-          id: userId,
+          id: userId, // This should be a UUID string
           username: null,
           email: user?.email || null,
           avatar_url: null,
@@ -212,7 +213,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (data.user) {
-        // Create profile - this will be handled by the auth state change listener
         console.log('User created successfully:', data.user.id)
       }
 
@@ -312,7 +312,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .eq('id', user.id)
 
       if (!error) {
-        setProfile(prev => prev ? { ...prev, ...updates } : null)
+        setProfile(prev => prev ? { ...prev, ...updates, updated_at: new Date().toISOString() } : null)
       }
 
       return { error }

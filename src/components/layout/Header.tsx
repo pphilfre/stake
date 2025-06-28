@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { User, Menu, X, Coins, Settings, LogOut, Crown, Wallet } from 'lucide-react'
+import { User, Menu, X, Coins, LogOut, Crown, Wallet } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../../contexts/WalletContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -17,6 +17,8 @@ export const Header: React.FC = () => {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   
+  const userMenuRef = useRef<HTMLDivElement>(null)
+  
   const { selectedCurrency, getBalance } = useWallet()
   const { user, profile, signOut } = useAuth()
   const location = useLocation()
@@ -25,6 +27,20 @@ export const Header: React.FC = () => {
     { name: 'Casino', href: '/casino', icon: Coins },
   ]
 
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
   const formatBalance = (amount: number) => {
     if (selectedCurrency === 'BTC') return amount.toFixed(8)
     if (selectedCurrency === 'ETH') return amount.toFixed(6)
@@ -32,7 +48,16 @@ export const Header: React.FC = () => {
   }
 
   const handleSignOut = async () => {
-    await signOut()
+    try {
+      await signOut()
+      setShowUserMenu(false)
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
+  const handleMenuItemClick = (action: () => void) => {
+    action()
     setShowUserMenu(false)
   }
 
@@ -86,7 +111,7 @@ export const Header: React.FC = () => {
                   </button>
 
                   {/* User Menu */}
-                  <div className="relative">
+                  <div className="relative" ref={userMenuRef}>
                     <button
                       onClick={() => setShowUserMenu(!showUserMenu)}
                       className="flex items-center space-x-2 p-2 rounded-lg hover:bg-white/5 transition-colors"
@@ -116,13 +141,10 @@ export const Header: React.FC = () => {
                           initial={{ opacity: 0, scale: 0.95, y: -10 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                          className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-2"
+                          className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-2 z-50"
                         >
                           <button
-                            onClick={() => {
-                              setIsProfileModalOpen(true)
-                              setShowUserMenu(false)
-                            }}
+                            onClick={() => handleMenuItemClick(() => setIsProfileModalOpen(true))}
                             className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
                           >
                             <User className="w-5 h-5" />
@@ -130,10 +152,7 @@ export const Header: React.FC = () => {
                           </button>
                           
                           <button
-                            onClick={() => {
-                              setIsWalletModalOpen(true)
-                              setShowUserMenu(false)
-                            }}
+                            onClick={() => handleMenuItemClick(() => setIsWalletModalOpen(true))}
                             className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
                           >
                             <Wallet className="w-5 h-5" />
@@ -141,10 +160,7 @@ export const Header: React.FC = () => {
                           </button>
 
                           <button
-                            onClick={() => {
-                              setIsAdminPanelOpen(true)
-                              setShowUserMenu(false)
-                            }}
+                            onClick={() => handleMenuItemClick(() => setIsAdminPanelOpen(true))}
                             className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-slate-700 transition-colors"
                           >
                             <Crown className="w-5 h-5" />

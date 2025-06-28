@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, RotateCw, Bomb, Gem, Zap, TrendingUp, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '../../contexts/WalletContext';
-import { useGame } from '../../contexts/GameContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
 import { AdminButton } from '../AdminButton';
 
@@ -29,7 +29,7 @@ export const MinesGame: React.FC = () => {
   const [autoplayCount, setAutoplayCount] = useState(0);
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
-  const { updateStats, generateProvablyFairSeed } = useGame();
+  const { recordGameResult } = useAuth();
   const { gameSettings } = useAdmin();
 
   const gridSize = 25; // 5x5 grid
@@ -127,7 +127,7 @@ export const MinesGame: React.FC = () => {
     return multiplier * 0.97; // House edge
   };
 
-  const revealCell = (cellId: number) => {
+  const revealCell = async (cellId: number) => {
     if (gameState !== 'playing') return;
     
     const cell = cells[cellId];
@@ -135,7 +135,7 @@ export const MinesGame: React.FC = () => {
 
     setAnimatingCell(cellId);
     
-    setTimeout(() => {
+    setTimeout(async () => {
       setCells(prev => prev.map(c => 
         c.id === cellId ? { ...c, revealed: true } : c
       ));
@@ -144,7 +144,15 @@ export const MinesGame: React.FC = () => {
         // Hit a mine - game over
         setGameState('finished');
         setShowLoseAnimation(true);
-        updateStats(parseFloat(betAmount), false);
+        
+        // Record game result
+        await recordGameResult('mines', parseFloat(betAmount), 0, selectedCurrency, {
+          mineCount,
+          revealedGems,
+          hitMine: true,
+          multiplier: currentMultiplier
+        });
+        
         setGameHistory(prev => [...prev.slice(-9), { 
           gems: revealedGems, 
           multiplier: currentMultiplier, 
@@ -168,7 +176,15 @@ export const MinesGame: React.FC = () => {
           setShowWinAnimation(true);
           const winAmount = parseFloat(betAmount) * newMultiplier;
           updateBalance(winAmount);
-          updateStats(parseFloat(betAmount), true);
+          
+          // Record game result
+          await recordGameResult('mines', parseFloat(betAmount), winAmount, selectedCurrency, {
+            mineCount,
+            revealedGems: newGemsCount,
+            allGemsFound: true,
+            multiplier: newMultiplier
+          });
+          
           setGameHistory(prev => [...prev.slice(-9), { 
             gems: newGemsCount, 
             multiplier: newMultiplier, 
@@ -181,14 +197,22 @@ export const MinesGame: React.FC = () => {
     }, 300);
   };
 
-  const cashOut = () => {
+  const cashOut = async () => {
     if (gameState !== 'playing' || revealedGems === 0) return;
     
     setGameState('finished');
     setShowWinAnimation(true);
     const winAmount = parseFloat(betAmount) * currentMultiplier;
     updateBalance(winAmount);
-    updateStats(parseFloat(betAmount), true);
+    
+    // Record game result
+    await recordGameResult('mines', parseFloat(betAmount), winAmount, selectedCurrency, {
+      mineCount,
+      revealedGems,
+      cashedOut: true,
+      multiplier: currentMultiplier
+    });
+    
     setGameHistory(prev => [...prev.slice(-9), { 
       gems: revealedGems, 
       multiplier: currentMultiplier, 
@@ -507,7 +531,7 @@ export const MinesGame: React.FC = () => {
                       }}
                       className={`w-full self-end ${isAutoplaying ? 'bg-red-500 hover:bg-red-600' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center space-x-2`}
                   >
-                      <RotateCw className={`w-5 h-5 ${isAutoplaying ? 'animate-spin' : ''}`} />
+                      <RotateCcw className={`w-5 h-5 ${isAutoplaying ? 'animate-spin' : ''}`} />
                       <span>{isAutoplaying ? `Stop Autoplay (${autoplayCount})` : 'Start Autoplay'}</span>
                   </button>
                 </div>

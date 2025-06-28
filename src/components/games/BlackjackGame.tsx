@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, RotateCw, Plus, Minus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '../../contexts/WalletContext';
-import { useGame } from '../../contexts/GameContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
 import { AdminButton } from '../AdminButton';
 
@@ -24,7 +24,7 @@ export const BlackjackGame: React.FC = () => {
   const [gameHistory, setGameHistory] = useState<Array<{result: string, playerScore: number, dealerScore: number}>>([]);
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
-  const { updateStats, generateProvablyFairSeed } = useGame();
+  const { recordGameResult } = useAuth();
   const { gameSettings } = useAdmin();
 
   const suits = ['♠', '♥', '♦', '♣'];
@@ -147,7 +147,7 @@ export const BlackjackGame: React.FC = () => {
     }
   };
 
-  const endGame = (gameResult: string) => {
+  const endGame = async (gameResult: string) => {
     setGameState('finished');
     setResult(gameResult);
     
@@ -174,7 +174,15 @@ export const BlackjackGame: React.FC = () => {
       updateBalance(winAmount);
     }
     
-    updateStats(parseFloat(betAmount), won);
+    // Record game result
+    await recordGameResult('blackjack', parseFloat(betAmount), winAmount, selectedCurrency, {
+      playerScore,
+      dealerScore: calculateScore(dealerCards),
+      result: gameResult,
+      playerCards,
+      dealerCards
+    });
+    
     setGameHistory(prev => [...prev.slice(-9), { 
       result: gameResult, 
       playerScore: playerScore, 
