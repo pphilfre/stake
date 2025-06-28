@@ -38,9 +38,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       playerLosses: won ? prev.playerLosses : prev.playerLosses + 1
     }));
 
-    // Record the game result in the auth context
-    const winAmount = won ? wagered * 2 : 0; // Simplified win calculation
-    recordGameResult('unknown', wagered, winAmount, 'USD');
+    // Don't record here - let individual games handle their own recording
+    console.log('Game stats updated:', { wagered, won });
   };
 
   const generateProvablyFairSeed = () => {

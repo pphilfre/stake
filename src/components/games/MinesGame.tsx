@@ -531,7 +531,7 @@ export const MinesGame: React.FC = () => {
                       }}
                       className={`w-full self-end ${isAutoplaying ? 'bg-red-500 hover:bg-red-600' : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center space-x-2`}
                   >
-                      <RotateCcw className={`w-5 h-5 ${isAutoplaying ? 'animate-spin' : ''}`} />
+                      <RotateCw className={`w-5 h-5 ${isAutoplaying ? 'animate-spin' : ''}`} />
                       <span>{isAutoplaying ? `Stop Autoplay (${autoplayCount})` : 'Start Autoplay'}</span>
                   </button>
                 </div>

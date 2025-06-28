@@ -33,17 +33,37 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     { symbol: 'ETH', name: 'Ethereum', balance: 5, usdRate: 2500 },
   ]);
   const [address, setAddress] = useState('');
+  const [initialized, setInitialized] = useState(false);
 
+  // Load wallet state from localStorage on mount
   useEffect(() => {
-    // Auto-connect wallet for demo purposes
-    if (!isConnected) {
+    const savedWallet = localStorage.getItem('wallet');
+    if (savedWallet) {
+      try {
+        const walletData = JSON.parse(savedWallet);
+        console.log('Loading saved wallet data:', walletData);
+        
+        if (walletData.isConnected) {
+          setIsConnected(walletData.isConnected);
+          setCurrencies(walletData.currencies || currencies);
+          setSelectedCurrency(walletData.selectedCurrency || 'USD');
+          setAddress(walletData.address || '');
+          console.log('Wallet state restored from localStorage');
+        }
+      } catch (error) {
+        console.error('Error loading wallet data:', error);
+      }
+    } else {
+      // Auto-connect wallet for demo purposes only if no saved data
+      console.log('No saved wallet data, auto-connecting...');
       connect();
     }
+    setInitialized(true);
   }, []);
 
+  // Save wallet state to localStorage whenever it changes
   useEffect(() => {
-    // Save wallet state to localStorage
-    if (isConnected) {
+    if (initialized && isConnected) {
       const walletData = {
         isConnected: true,
         currencies,
@@ -51,30 +71,20 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         address
       };
       localStorage.setItem('wallet', JSON.stringify(walletData));
+      console.log('Wallet state saved to localStorage:', walletData);
     }
-  }, [isConnected, currencies, selectedCurrency, address]);
-
-  useEffect(() => {
-    // Load wallet state from localStorage
-    const savedWallet = localStorage.getItem('wallet');
-    if (savedWallet) {
-      try {
-        const walletData = JSON.parse(savedWallet);
-        if (walletData.isConnected) {
-          setIsConnected(walletData.isConnected);
-          setCurrencies(walletData.currencies || currencies);
-          setSelectedCurrency(walletData.selectedCurrency || 'USD');
-          setAddress(walletData.address || '');
-        }
-      } catch (error) {
-        console.error('Error loading wallet data:', error);
-      }
-    }
-  }, []);
+  }, [initialized, isConnected, currencies, selectedCurrency, address]);
 
   const connect = () => {
+    // Check if we already have saved data
+    const savedWallet = localStorage.getItem('wallet');
+    if (savedWallet && initialized) {
+      console.log('Wallet already connected, not resetting balances');
+      return;
+    }
+
     // Simulate wallet connection
-    const mockAddress = '0x' + Math.random().toString(16).substr(2, 40);
+    const mockAddress = '0x' + Math.random().toString(16).substr(2, 13);
     
     setIsConnected(true);
     setAddress(mockAddress);
@@ -91,6 +101,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     ]);
     setAddress('');
     localStorage.removeItem('wallet');
+    console.log('Wallet disconnected and localStorage cleared');
   };
 
   const deposit = (amount: number, currency: string = selectedCurrency) => {
@@ -113,10 +124,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateBalance = (amount: number, currency: string = selectedCurrency) => {
-    setCurrencies(prev => prev.map(c => 
-      c.symbol === currency ? { ...c, balance: Math.max(0, c.balance + amount) } : c
-    ));
-    console.log(`Updated balance by ${amount} ${currency}. New balance:`, getBalance(currency) + amount);
+    setCurrencies(prev => {
+      const newCurrencies = prev.map(c => 
+        c.symbol === currency ? { ...c, balance: Math.max(0, c.balance + amount) } : c
+      );
+      const newBalance = newCurrencies.find(c => c.symbol === currency)?.balance || 0;
+      console.log(`Updated balance by ${amount} ${currency}. New balance: ${newBalance}`);
+      return newCurrencies;
+    });
   };
 
   const switchCurrency = (currency: string) => {

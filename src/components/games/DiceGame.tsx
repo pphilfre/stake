@@ -15,7 +15,7 @@ export const DiceGame: React.FC = () => {
   const [gameHistory, setGameHistory] = useState<Array<{result: number, prediction: string, won: boolean}>>([]);
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
-  const { recordGameResult } = useAuth();
+  const { recordGameResult, gameResults } = useAuth();
   const { gameSettings } = useAdmin();
 
   const multiplier = prediction === 'over' 
@@ -263,28 +263,40 @@ export const DiceGame: React.FC = () => {
           <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
             <h3 className="text-xl font-semibold text-white mb-4">Recent Games</h3>
             <div className="space-y-2">
-              {gameHistory.map((game, index) => (
+              {gameResults.filter(result => result.game_type === 'dice').slice(0, 10).map((result, index) => (
                 <div
-                  key={index}
+                  key={result.id || index}
                   className={`flex items-center justify-between p-3 rounded-lg ${
-                    game.won ? 'bg-green-600/20 border border-green-600/30' : 'bg-red-600/20 border border-red-600/30'
+                    result.win_amount > result.bet_amount ? 'bg-green-600/20 border border-green-600/30' : 'bg-red-600/20 border border-red-600/30'
                   }`}
                 >
                   <div className="flex items-center space-x-2">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      game.won ? 'bg-green-600' : 'bg-red-600'
+                      result.win_amount > result.bet_amount ? 'bg-green-600' : 'bg-red-600'
                     }`}>
-                      <span className="text-white text-sm font-bold">{game.result}</span>
+                      <span className="text-white text-sm font-bold">
+                        {result.game_data?.roll || '?'}
+                      </span>
                     </div>
                     <div>
-                      <div className="text-white text-sm font-medium">{game.prediction}</div>
+                      <div className="text-white text-sm font-medium">
+                        {result.game_data?.prediction || 'dice'}
+                      </div>
+                      <div className="text-gray-400 text-xs">
+                        {result.multiplier.toFixed(2)}x
+                      </div>
                     </div>
                   </div>
-                  <div className={`text-sm font-semibold ${game.won ? 'text-green-400' : 'text-red-400'}`}>
-                    {game.won ? 'WIN' : 'LOSS'}
+                  <div className={`text-sm font-semibold ${result.win_amount > result.bet_amount ? 'text-green-400' : 'text-red-400'}`}>
+                    {result.win_amount > result.bet_amount ? 'WIN' : 'LOSS'}
                   </div>
                 </div>
               ))}
+              {gameResults.filter(result => result.game_type === 'dice').length === 0 && (
+                <div className="text-center text-gray-400 py-4">
+                  No games played yet
+                </div>
+              )}
             </div>
           </div>
         </div>
