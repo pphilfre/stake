@@ -9,12 +9,23 @@ interface GameSettings {
   enabled: boolean;
 }
 
+interface GlobalSettings {
+  platformName: string;
+  defaultCurrency: string;
+  maxDailyWithdrawal: number;
+  minimumAge: number;
+  maintenanceMode: boolean;
+  registrationEnabled: boolean;
+}
+
 interface AdminContextType {
   isAdminAuthenticated: boolean;
   authenticateAdmin: (pin: string) => boolean;
   logoutAdmin: () => void;
   gameSettings: Record<string, GameSettings>;
+  globalSettings: GlobalSettings;
   updateGameSettings: (gameId: string, settings: Partial<GameSettings>) => void;
+  updateGlobalSettings: (settings: Partial<GlobalSettings>) => void;
   resetGameSettings: (gameId: string) => void;
 }
 
@@ -25,6 +36,15 @@ const defaultGameSettings: GameSettings = {
   houseEdge: 2.5,
   maxPayout: 10000,
   enabled: true,
+};
+
+const defaultGlobalSettings: GlobalSettings = {
+  platformName: 'Steak Casino',
+  defaultCurrency: 'USD',
+  maxDailyWithdrawal: 10000,
+  minimumAge: 18,
+  maintenanceMode: false,
+  registrationEnabled: true,
 };
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -40,6 +60,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     mines: { ...defaultGameSettings, winRate: 45 },
     plinko: { ...defaultGameSettings, winRate: 49 },
   });
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>(defaultGlobalSettings);
 
   const authenticateAdmin = (pin: string): boolean => {
     if (pin === ADMIN_PIN) {
@@ -60,6 +81,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const updateGlobalSettings = (settings: Partial<GlobalSettings>) => {
+    setGlobalSettings(prev => ({ ...prev, ...settings }));
+  };
+
   const resetGameSettings = (gameId: string) => {
     setGameSettings(prev => ({
       ...prev,
@@ -73,7 +98,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       authenticateAdmin,
       logoutAdmin,
       gameSettings,
+      globalSettings,
       updateGameSettings,
+      updateGlobalSettings,
       resetGameSettings,
     }}>
       {children}

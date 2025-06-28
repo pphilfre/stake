@@ -1,35 +1,33 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Header } from './components/Header';
-import { Hero } from './components/Hero';
-import { Casino } from './components/Casino';
-import { Sportsbook } from './components/SportsbookNew';
-import { WalletProvider } from './contexts/WalletContext';
-import { GameProvider } from './contexts/GameContext';
-import { AdminProvider } from './contexts/AdminContext';
-import { SportsProvider } from './contexts/SportsContext';
+import React from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { Header } from './components/layout/Header'
+import { Hero } from './components/Hero'
+import { Casino } from './components/Casino'
+import { WalletProvider } from './contexts/WalletContext'
+import { GameProvider } from './contexts/GameContext'
+import { AdminProvider } from './contexts/AdminContext'
+import { AuthProvider } from './contexts/AuthContext'
 
 function App() {
   return (
-    <WalletProvider>
-      <GameProvider>
-        <AdminProvider>
-          <SportsProvider>
+    <AuthProvider>
+      <WalletProvider>
+        <GameProvider>
+          <AdminProvider>
             <Router>
-              <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900">
+              <div className="min-h-screen bg-[#0f1419]">
                 <Header />
                 <Routes>
                   <Route path="/" element={<Hero />} />
                   <Route path="/casino" element={<Casino />} />
-                  <Route path="/sportsbook" element={<Sportsbook />} />
                 </Routes>
               </div>
             </Router>
-          </SportsProvider>
-        </AdminProvider>
-      </GameProvider>
-    </WalletProvider>
-  );
+          </AdminProvider>
+        </GameProvider>
+      </WalletProvider>
+    </AuthProvider>
+  )
 }
 
-export default App;
+export default App
