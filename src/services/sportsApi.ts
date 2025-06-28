@@ -84,10 +84,12 @@ export interface LiveStats {
 
 class SportsApiService {
   private footballApiKey: string;
+  private nbaApiKey: string;
   
   constructor() {
     // In production, these would come from environment variables
     this.footballApiKey = import.meta.env?.VITE_FOOTBALL_API_KEY || 'demo-key';
+    this.nbaApiKey = import.meta.env?.VITE_NBA_API_KEY || '';
   }
 
   // Get live and upcoming matches
@@ -182,8 +184,17 @@ class SportsApiService {
 
   private async getBasketballMatches(_live?: boolean): Promise<Match[]> {
     try {
+      // Skip API call if no API key is available
+      if (!this.nbaApiKey) {
+        console.log('No NBA API key available, using mock data');
+        return this.getMockMatches('basketball', _live);
+      }
+
       // Using Ball Don't Lie API for NBA
       const response = await axios.get(`${NBA_API_BASE}/games`, {
+        headers: {
+          'Authorization': `Bearer ${this.nbaApiKey}`
+        },
         params: {
           'dates[]': new Date().toISOString().split('T')[0],
           per_page: 25
