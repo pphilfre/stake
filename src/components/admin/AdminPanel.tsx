@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { X, Settings, Lock, Unlock, RotateCcw, Save, Eye, EyeOff, Crown } from 'lucide-react'
+import { X, Settings, Lock, Unlock, RotateCcw, Save, Eye, EyeOff, Crown, TrendingUp, DollarSign, Users, Gamepad2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAdmin } from '../../contexts/AdminContext'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface AdminPanelProps {
   gameId?: string
@@ -19,10 +20,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameId, isVisible, onClo
     resetGameSettings
   } = useAdmin()
   
+  const { gameResults, profile } = useAuth()
+  
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState('')
   const [showPin, setShowPin] = useState(false)
   const [tempSettings, setTempSettings] = useState(gameId ? gameSettings[gameId] || {} : {})
+  const [activeTab, setActiveTab] = useState<'overview' | 'games' | 'settings'>('overview')
 
   if (!isVisible) return null
 
@@ -61,13 +65,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameId, isVisible, onClo
     setPinError('')
   }
 
+  // Calculate admin stats
+  const totalGamesPlayed = gameResults.length
+  const totalWagered = gameResults.reduce((sum, result) => sum + result.bet_amount, 0)
+  const totalWon = gameResults.reduce((sum, result) => sum + result.win_amount, 0)
+  const houseProfit = totalWagered - totalWon
+  const averageBet = totalGamesPlayed > 0 ? totalWagered / totalGamesPlayed : 0
+
+  // Game type breakdown
+  const gameBreakdown = gameResults.reduce((acc, result) => {
+    acc[result.game_type] = (acc[result.game_type] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 w-full max-w-4xl border border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 w-full max-w-6xl border border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-3">
@@ -137,7 +154,144 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameId, isVisible, onClo
               </button>
             </div>
 
-            {gameId && (
+            {/* Tabs */}
+            <div className="flex space-x-1 bg-slate-800 rounded-lg p-1">
+              {[
+                { id: 'overview', label: 'Overview', icon: TrendingUp },
+                { id: 'games', label: 'Games', icon: Gamepad2 },
+                { id: 'settings', label: 'Settings', icon: Settings }
+              ].map((tab) => {
+                const Icon = tab.icon
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex-1 py-3 px-4 rounded-md text-sm font-medium transition-all flex items-center justify-center space-x-2 ${
+                      activeTab === tab.id
+                        ? 'bg-yellow-500 text-black'
+                        : 'text-gray-300 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <Gamepad2 className="w-6 h-6 text-blue-500" />
+                      <span className="text-gray-400 text-sm">Total Games</span>
+                    </div>
+                    <p className="text-3xl font-bold text-white">{totalGamesPlayed}</p>
+                  </div>
+
+                  <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <DollarSign className="w-6 h-6 text-green-500" />
+                      <span className="text-gray-400 text-sm">Total Wagered</span>
+                    </div>
+                    <p className="text-3xl font-bold text-white">${totalWagered.toFixed(2)}</p>
+                  </div>
+
+                  <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <TrendingUp className="w-6 h-6 text-yellow-500" />
+                      <span className="text-gray-400 text-sm">House Profit</span>
+                    </div>
+                    <p className={`text-3xl font-bold ${houseProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      ${houseProfit.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <Users className="w-6 h-6 text-purple-500" />
+                      <span className="text-gray-400 text-sm">Avg Bet</span>
+                    </div>
+                    <p className="text-3xl font-bold text-white">${averageBet.toFixed(2)}</p>
+                  </div>
+                </div>
+
+                {/* Game Breakdown */}
+                <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                  <h3 className="text-xl font-semibold text-white mb-4">Game Breakdown</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {Object.entries(gameBreakdown).map(([game, count]) => (
+                      <div key={game} className="text-center">
+                        <div className="text-2xl font-bold text-white">{count}</div>
+                        <div className="text-gray-400 text-sm capitalize">{game}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Activity */}
+                <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                  <h3 className="text-xl font-semibold text-white mb-4">Recent Activity</h3>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {gameResults.slice(0, 10).map((result, index) => (
+                      <div key={result.id || index} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
+                        <div>
+                          <p className="text-white font-medium capitalize">{result.game_type}</p>
+                          <p className="text-gray-400 text-sm">
+                            {new Date(result.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-white font-medium">${result.bet_amount.toFixed(2)}</p>
+                          <p className={`text-sm ${result.win_amount > result.bet_amount ? 'text-green-400' : 'text-red-400'}`}>
+                            {result.win_amount > result.bet_amount ? '+' : ''}${(result.win_amount - result.bet_amount).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Games Tab */}
+            {activeTab === 'games' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Object.entries(gameSettings).map(([game, settings]) => (
+                    <div key={game} className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                      <h3 className="text-xl font-semibold text-white mb-4 capitalize">{game}</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Status</span>
+                          <span className={`font-semibold ${settings.enabled ? 'text-green-400' : 'text-red-400'}`}>
+                            {settings.enabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Win Rate</span>
+                          <span className="text-white">{settings.winRate}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">House Edge</span>
+                          <span className="text-white">{settings.houseEdge}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Min/Max Bet</span>
+                          <span className="text-white">${settings.minBet} - ${settings.maxBet}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Settings Tab */}
+            {activeTab === 'settings' && gameId && (
               <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
                 <h3 className="text-2xl font-semibold text-white mb-6 capitalize flex items-center space-x-2">
                   <Settings className="w-6 h-6" />

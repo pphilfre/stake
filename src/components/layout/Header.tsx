@@ -68,11 +68,13 @@ export const Header: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center">
+              <Link to="/" className="flex items-center space-x-3 group">
+                <div className="w-10 h-10 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                   <span className="text-black font-bold text-xl">🥩</span>
                 </div>
-                <span className="text-2xl font-bold text-white">Steak</span>
+                <span className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+                  Steak
+                </span>
               </Link>
             </div>
 
@@ -86,7 +88,7 @@ export const Header: React.FC = () => {
                     to={item.href}
                     className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       location.pathname === item.href
-                        ? 'text-yellow-500 bg-yellow-500/10'
+                        ? 'text-yellow-500 bg-yellow-500/10 border border-yellow-500/20'
                         : 'text-gray-300 hover:text-white hover:bg-white/5'
                     }`}
                   >
@@ -104,9 +106,9 @@ export const Header: React.FC = () => {
                   {/* Balance */}
                   <button
                     onClick={() => setIsWalletModalOpen(true)}
-                    className="hidden sm:flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-4 py-2 rounded-lg transition-all"
+                    className="hidden sm:flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-yellow-500/50 text-white px-4 py-2 rounded-lg transition-all group"
                   >
-                    <Wallet className="w-4 h-4 text-yellow-500" />
+                    <Wallet className="w-4 h-4 text-yellow-500 group-hover:scale-110 transition-transform" />
                     <span className="font-medium">{formatBalance(getBalance())} {selectedCurrency}</span>
                   </button>
 
@@ -114,9 +116,9 @@ export const Header: React.FC = () => {
                   <div className="relative" ref={userMenuRef}>
                     <button
                       onClick={() => setShowUserMenu(!showUserMenu)}
-                      className="flex items-center space-x-2 p-2 rounded-lg hover:bg-white/5 transition-colors"
+                      className="flex items-center space-x-2 p-2 rounded-lg hover:bg-white/5 transition-colors group"
                     >
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center border-2 border-yellow-500">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center border-2 border-yellow-500 group-hover:border-yellow-400 transition-colors">
                         {profile?.avatar_url ? (
                           <img 
                             src={profile.avatar_url} 
@@ -130,7 +132,7 @@ export const Header: React.FC = () => {
                         ) : null}
                         <User className={`w-5 h-5 text-gray-400 ${profile?.avatar_url ? 'hidden' : ''}`} />
                       </div>
-                      <span className="hidden sm:block text-white font-medium">
+                      <span className="hidden sm:block text-white font-medium group-hover:text-yellow-400 transition-colors">
                         {profile?.username || 'User'}
                       </span>
                     </button>
@@ -141,7 +143,7 @@ export const Header: React.FC = () => {
                           initial={{ opacity: 0, scale: 0.95, y: -10 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                          className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-2 z-50"
+                          className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-2 z-50 backdrop-blur-sm"
                         >
                           <button
                             onClick={() => handleMenuItemClick(() => setIsProfileModalOpen(true))}
@@ -184,7 +186,7 @@ export const Header: React.FC = () => {
               ) : (
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold px-6 py-2 rounded-lg transition-all"
+                  className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold px-6 py-2 rounded-lg transition-all transform hover:scale-105"
                 >
                   Sign In
                 </button>
@@ -193,7 +195,7 @@ export const Header: React.FC = () => {
               {/* Mobile menu button */}
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden text-white p-2"
+                className="md:hidden text-white p-2 hover:bg-white/5 rounded-lg transition-colors"
               >
                 {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
