@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
 interface Profile {
   id: string
@@ -63,32 +63,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check for guest profile in localStorage
+    // Check for guest profile in localStorage first
     const guestProfile = localStorage.getItem('guestProfile')
     if (guestProfile) {
-      const parsedProfile = JSON.parse(guestProfile)
-      setProfile(parsedProfile)
-      setUser({ id: parsedProfile.id } as User)
-      
-      // Load guest game results
-      const guestResults = JSON.parse(localStorage.getItem('guestGameResults') || '[]')
-      setGameResults(guestResults)
+      try {
+        const parsedProfile = JSON.parse(guestProfile)
+        setProfile(parsedProfile)
+        setUser({ id: parsedProfile.id } as User)
+        
+        // Load guest game results
+        const guestResults = JSON.parse(localStorage.getItem('guestGameResults') || '[]')
+        setGameResults(guestResults)
+        setLoading(false)
+        return
+      } catch (error) {
+        console.error('Error parsing guest profile:', error)
+        localStorage.removeItem('guestProfile')
+        localStorage.removeItem('guestGameResults')
+      }
+    }
+
+    // Only try Supabase if it's configured
+    if (!isSupabaseConfigured) {
       setLoading(false)
       return
     }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Error getting session:', error)
+        setLoading(false)
+        return
+      }
+      
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
         loadProfile(session.user.id)
+      } else {
+        setLoading(false)
       }
-      setLoading(false)
     })
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id)
       setSession(session)
       setUser(session?.user ?? null)
       
@@ -106,6 +126,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [])
 
   const loadProfile = async (userId: string) => {
+    if (!isSupabaseConfigured) return
+
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -132,19 +154,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .select()
           .single()
 
-        if (!createError) {
+        if (!createError && createdProfile) {
           setProfile(createdProfile)
+        } else {
+          console.error('Error creating profile:', createError)
         }
-      } else if (!error) {
+      } else if (!error && data) {
         setProfile(data)
+      } else {
+        console.error('Error loading profile:', error)
       }
     } catch (error) {
-      console.error('Error loading profile:', error)
+      console.error('Error in loadProfile:', error)
     }
   }
 
   const loadGameResults = async () => {
-    if (!user) return
+    if (!user || !isSupabaseConfigured) return
 
     try {
       const { data, error } = await supabase
@@ -154,15 +180,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .order('created_at', { ascending: false })
         .limit(10)
 
-      if (!error) {
-        setGameResults(data || [])
+      if (!error && data) {
+        setGameResults(data)
+      } else if (error) {
+        console.error('Error loading game results:', error)
       }
     } catch (error) {
-      console.error('Error loading game results:', error)
+      console.error('Error in loadGameResults:', error)
     }
   }
 
   const signUp = async (email: string, password: string, username: string) => {
+    if (!isSupabaseConfigured) {
+      return { error: new Error('Supabase not configured. Playing as guest instead.') }
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -174,17 +206,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       })
 
-      if (!error && data.user) {
-        // Create profile
-        await supabase.from('profiles').insert({
-          id: data.user.id,
-          username,
-          email,
-          is_guest: false
-        })
+      if (error) {
+        console.error('Signup error:', error)
+        return { error }
       }
 
-      return { error }
+      if (data.user) {
+        // Create profile - this will be handled by the auth state change listener
+        console.log('User created successfully:', data.user.id)
+      }
+
+      return { error: null }
     } catch (error) {
       console.error('Signup error:', error)
       return { error }
@@ -192,11 +224,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const signIn = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) {
+      return { error: new Error('Supabase not configured. Playing as guest instead.') }
+    }
+
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       })
+      
+      if (error) {
+        console.error('Signin error:', error)
+      }
+      
       return { error }
     } catch (error) {
       console.error('Signin error:', error)
@@ -209,10 +250,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('guestProfile')
     localStorage.removeItem('guestGameResults')
     
-    await supabase.auth.signOut()
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut()
+    } else {
+      // Manual cleanup for guest mode
+      setUser(null)
+      setProfile(null)
+      setGameResults([])
+      setSession(null)
+    }
   }
 
   const playAsGuest = async () => {
+    // Clear any existing auth
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut()
+    }
+
     // Create a guest user
     const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const guestProfile: Profile = {
@@ -230,6 +284,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     setProfile(guestProfile)
     setUser({ id: guestId } as User)
+    setGameResults([])
     
     // Store guest data in localStorage
     localStorage.setItem('guestProfile', JSON.stringify(guestProfile))
@@ -244,6 +299,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setProfile(updatedProfile)
       localStorage.setItem('guestProfile', JSON.stringify(updatedProfile))
       return { error: null }
+    }
+
+    if (!isSupabaseConfigured) {
+      return { error: new Error('Supabase not configured') }
     }
 
     try {
@@ -280,11 +339,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (profile.is_guest) {
       // Store in localStorage for guests
       const guestResults = JSON.parse(localStorage.getItem('guestGameResults') || '[]')
-      guestResults.unshift({ ...gameResult, id: Date.now().toString(), created_at: new Date().toISOString() })
+      const newResult = { 
+        ...gameResult, 
+        id: Date.now().toString(), 
+        created_at: new Date().toISOString() 
+      }
+      guestResults.unshift(newResult)
       guestResults.splice(10) // Keep only last 10
       localStorage.setItem('guestGameResults', JSON.stringify(guestResults))
       setGameResults(guestResults)
-    } else {
+    } else if (isSupabaseConfigured) {
       // Store in Supabase for registered users
       try {
         const { error } = await supabase
@@ -293,6 +357,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (!error) {
           await loadGameResults()
+        } else {
+          console.error('Error recording game result:', error)
         }
       } catch (error) {
         console.error('Error recording game result:', error)

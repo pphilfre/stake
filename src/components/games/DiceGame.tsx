@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Play } from 'lucide-react';
 import { useWallet } from '../../contexts/WalletContext';
 import { useGame } from '../../contexts/GameContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
 import { AdminButton } from '../AdminButton';
 
@@ -15,7 +16,8 @@ export const DiceGame: React.FC = () => {
   const [gameHistory, setGameHistory] = useState<Array<{result: number, prediction: string, won: boolean}>>([]);
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
-  const { updateStats, generateProvablyFairSeed } = useGame();
+  const { generateProvablyFairSeed } = useGame();
+  const { recordGameResult } = useAuth();
   const { gameSettings } = useAdmin();
 
   const multiplier = prediction === 'over' 
@@ -77,12 +79,19 @@ export const DiceGame: React.FC = () => {
     const won = (prediction === 'over' && roll > rollOver) || (prediction === 'under' && roll < rollOver);
     setLastWin(won);
 
+    const winAmount = won ? parseFloat(betAmount) * multiplier : 0;
     if (won) {
-      const winAmount = parseFloat(betAmount) * multiplier;
       updateBalance(winAmount);
     }
 
-    updateStats(parseFloat(betAmount), won);
+    // Record game result
+    await recordGameResult('dice', parseFloat(betAmount), winAmount, selectedCurrency, {
+      roll,
+      prediction,
+      rollOver,
+      multiplier
+    });
+
     setGameHistory(prev => [...prev.slice(-9), { result: roll, prediction: `${prediction} ${rollOver}`, won }]);
   };
 
