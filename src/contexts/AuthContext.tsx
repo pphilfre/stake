@@ -129,6 +129,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!isSupabaseConfigured) return
 
     try {
+      console.log('Loading profile for user:', userId)
+      
       // First try to get existing profile
       const { data, error } = await supabase
         .from('profiles')
@@ -138,8 +140,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error && error.code === 'PGRST116') {
         // Profile doesn't exist, create one
+        console.log('Profile not found, creating new profile')
         const newProfile = {
-          id: userId, // This should be a UUID string
+          id: userId, // This is now a UUID string from Supabase Auth
           username: null,
           email: user?.email || null,
           avatar_url: null,
@@ -156,11 +159,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .single()
 
         if (!createError && createdProfile) {
+          console.log('Profile created successfully:', createdProfile)
           setProfile(createdProfile)
         } else {
           console.error('Error creating profile:', createError)
         }
       } else if (!error && data) {
+        console.log('Profile loaded successfully:', data)
         setProfile(data)
       } else {
         console.error('Error loading profile:', error)
@@ -214,6 +219,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (data.user) {
         console.log('User created successfully:', data.user.id)
+        // Profile will be created automatically when auth state changes
       }
 
       return { error: null }
