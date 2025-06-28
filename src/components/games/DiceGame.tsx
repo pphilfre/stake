@@ -42,7 +42,10 @@ export const DiceGame: React.FC = () => {
     setIsRolling(true);
     setDiceResult(null);
     setLastWin(null);
+    
+    // Deduct bet amount immediately
     updateBalance(-parseFloat(betAmount));
+    console.log(`Deducted bet: ${betAmount} ${selectedCurrency}`);
 
     let roll = Math.floor(Math.random() * 100) + 1;
 
@@ -78,6 +81,9 @@ export const DiceGame: React.FC = () => {
     const winAmount = won ? parseFloat(betAmount) * multiplier : 0;
     if (won) {
       updateBalance(winAmount);
+      console.log(`Won: ${winAmount} ${selectedCurrency}`);
+    } else {
+      console.log(`Lost: ${betAmount} ${selectedCurrency}`);
     }
 
     // Record game result
@@ -89,6 +95,7 @@ export const DiceGame: React.FC = () => {
         multiplier,
         won
       });
+      console.log('Game result recorded successfully');
     } catch (error) {
       console.error('Error recording game result:', error);
     }

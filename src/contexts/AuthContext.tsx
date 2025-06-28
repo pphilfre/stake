@@ -75,6 +75,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const guestResults = JSON.parse(localStorage.getItem('guestGameResults') || '[]')
         setGameResults(guestResults)
         setLoading(false)
+        console.log('Loaded guest profile:', parsedProfile)
         return
       } catch (error) {
         console.error('Error parsing guest profile:', error)
@@ -103,6 +104,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
         loadProfile(session.user.id)
+        loadGameResults()
       } else {
         setLoading(false)
       }
@@ -138,13 +140,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle() // Use maybeSingle instead of single to avoid errors when no rows
+        .maybeSingle()
 
       if (!data && !error) {
         // Profile doesn't exist, create one
         console.log('Profile not found, creating new profile')
         const newProfile = {
-          id: userId, // This is now a UUID string from Supabase Auth
+          id: userId,
           username: null,
           email: user?.email || null,
           avatar_url: null,
@@ -165,7 +167,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setProfile(createdProfile)
         } else {
           console.error('Error creating profile:', createError)
-          // If profile creation fails due to duplicate, try to fetch again
           if (createError?.code === '23505') {
             const { data: existingProfile } = await supabase
               .from('profiles')
@@ -194,6 +195,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!user || !isSupabaseConfigured) return
 
     try {
+      console.log('Loading game results for user:', user.id)
       const { data, error } = await supabase
         .from('game_results')
         .select('*')
@@ -202,7 +204,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .limit(10)
 
       if (!error && data) {
-        console.log('Game results loaded:', data.length)
+        console.log('Game results loaded:', data.length, 'results')
         setGameResults(data)
       } else if (error) {
         console.error('Error loading game results:', error)
@@ -235,7 +237,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (data.user) {
         console.log('User created successfully:', data.user.id)
-        // Profile will be created automatically when auth state changes
       }
 
       return { error: null }
@@ -380,17 +381,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       guestResults.splice(10) // Keep only last 10
       localStorage.setItem('guestGameResults', JSON.stringify(guestResults))
       setGameResults(guestResults)
-      console.log('Guest game result recorded')
+      console.log('Guest game result recorded:', newResult)
     } else if (isSupabaseConfigured) {
       // Store in Supabase for registered users
       try {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('game_results')
           .insert(gameResult)
+          .select()
+          .single()
 
-        if (!error) {
-          console.log('Game result recorded in Supabase')
-          await loadGameResults()
+        if (!error && data) {
+          console.log('Game result recorded in Supabase:', data)
+          // Immediately add to local state
+          setGameResults(prev => [data, ...prev.slice(0, 9)])
         } else {
           console.error('Error recording game result:', error)
         }

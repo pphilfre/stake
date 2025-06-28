@@ -28,51 +28,66 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
   const [currencies, setCurrencies] = useState<Currency[]>([
-    { symbol: 'USD', name: 'US Dollar', balance: 0, usdRate: 1 },
-    { symbol: 'BTC', name: 'Bitcoin', balance: 0, usdRate: 45000 },
-    { symbol: 'ETH', name: 'Ethereum', balance: 0, usdRate: 2500 },
+    { symbol: 'USD', name: 'US Dollar', balance: 1000, usdRate: 1 },
+    { symbol: 'BTC', name: 'Bitcoin', balance: 0.1, usdRate: 45000 },
+    { symbol: 'ETH', name: 'Ethereum', balance: 5, usdRate: 2500 },
   ]);
   const [address, setAddress] = useState('');
 
   useEffect(() => {
-    // Simulate wallet connection persistence
+    // Auto-connect wallet for demo purposes
+    if (!isConnected) {
+      connect();
+    }
+  }, []);
+
+  useEffect(() => {
+    // Save wallet state to localStorage
+    if (isConnected) {
+      const walletData = {
+        isConnected: true,
+        currencies,
+        selectedCurrency,
+        address
+      };
+      localStorage.setItem('wallet', JSON.stringify(walletData));
+    }
+  }, [isConnected, currencies, selectedCurrency, address]);
+
+  useEffect(() => {
+    // Load wallet state from localStorage
     const savedWallet = localStorage.getItem('wallet');
     if (savedWallet) {
-      const walletData = JSON.parse(savedWallet);
-      setIsConnected(walletData.isConnected);
-      setCurrencies(walletData.currencies || currencies);
-      setSelectedCurrency(walletData.selectedCurrency || 'USD');
-      setAddress(walletData.address);
+      try {
+        const walletData = JSON.parse(savedWallet);
+        if (walletData.isConnected) {
+          setIsConnected(walletData.isConnected);
+          setCurrencies(walletData.currencies || currencies);
+          setSelectedCurrency(walletData.selectedCurrency || 'USD');
+          setAddress(walletData.address || '');
+        }
+      } catch (error) {
+        console.error('Error loading wallet data:', error);
+      }
     }
   }, []);
 
   const connect = () => {
     // Simulate wallet connection
     const mockAddress = '0x' + Math.random().toString(16).substr(2, 40);
-    const initialCurrencies = [
-      { symbol: 'USD', name: 'US Dollar', balance: Math.random() * 1000, usdRate: 1 },
-      { symbol: 'BTC', name: 'Bitcoin', balance: Math.random() * 0.1, usdRate: 45000 },
-      { symbol: 'ETH', name: 'Ethereum', balance: Math.random() * 5, usdRate: 2500 },
-    ];
     
     setIsConnected(true);
-    setCurrencies(initialCurrencies);
     setAddress(mockAddress);
     
-    localStorage.setItem('wallet', JSON.stringify({
-      isConnected: true,
-      currencies: initialCurrencies,
-      selectedCurrency,
-      address: mockAddress
-    }));
+    console.log('Wallet connected with address:', mockAddress);
   };
 
   const disconnect = () => {
     setIsConnected(false);
     setCurrencies([
-      { symbol: 'USD', name: 'US Dollar', balance: 0, usdRate: 1 },
-      { symbol: 'BTC', name: 'Bitcoin', balance: 0, usdRate: 45000 },
-      { symbol: 'ETH', name: 'Ethereum', balance: 0, usdRate: 2500 },
+      { symbol: 'USD', name: 'US Dollar', balance: 1000, usdRate: 1 },
+      { symbol: 'BTC', name: 'Bitcoin', balance: 0.1, usdRate: 45000 },
+      { symbol: 'ETH', name: 'Ethereum', balance: 5, usdRate: 2500 },
     ]);
     setAddress('');
     localStorage.removeItem('wallet');
@@ -82,16 +97,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setCurrencies(prev => prev.map(c => 
       c.symbol === currency ? { ...c, balance: c.balance + amount } : c
     ));
-    updateLocalStorage();
+    console.log(`Deposited ${amount} ${currency}`);
   };
 
   const withdraw = (amount: number, currency: string = selectedCurrency) => {
     const currencyData = currencies.find(c => c.symbol === currency);
     if (currencyData && amount <= currencyData.balance) {
       setCurrencies(prev => prev.map(c => 
-        c.symbol === currency ? { ...c, balance: c.balance - amount } : c
+        c.symbol === currency ? { ...c, balance: Math.max(0, c.balance - amount) } : c
       ));
-      updateLocalStorage();
+      console.log(`Withdrew ${amount} ${currency}`);
+    } else {
+      console.log(`Insufficient balance for withdrawal of ${amount} ${currency}`);
     }
   };
 
@@ -99,33 +116,23 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setCurrencies(prev => prev.map(c => 
       c.symbol === currency ? { ...c, balance: Math.max(0, c.balance + amount) } : c
     ));
-    updateLocalStorage();
+    console.log(`Updated balance by ${amount} ${currency}. New balance:`, getBalance(currency) + amount);
   };
 
   const switchCurrency = (currency: string) => {
     setSelectedCurrency(currency);
-    updateLocalStorage();
+    console.log('Switched to currency:', currency);
   };
 
   const getBalance = (currency: string = selectedCurrency) => {
     const currencyData = currencies.find(c => c.symbol === currency);
-    return currencyData?.balance || 0;
+    const balance = currencyData?.balance || 0;
+    return balance;
   };
 
   const convertToUSD = (amount: number, currency: string) => {
     const currencyData = currencies.find(c => c.symbol === currency);
     return currencyData ? amount * currencyData.usdRate : amount;
-  };
-
-  const updateLocalStorage = () => {
-    if (isConnected) {
-      localStorage.setItem('wallet', JSON.stringify({
-        isConnected: true,
-        currencies,
-        selectedCurrency,
-        address
-      }));
-    }
   };
 
   return (
