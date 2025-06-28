@@ -3,6 +3,7 @@ import { Play, RotateCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '../../contexts/WalletContext';
 import { useGame } from '../../contexts/GameContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
 import { AdminButton } from '../AdminButton';
 
@@ -22,6 +23,7 @@ export const RouletteGame: React.FC = () => {
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
   const { updateStats, generateProvablyFairSeed } = useGame();
+  const { recordGameResult, gameResults } = useAuth();
   const { gameSettings } = useAdmin();
 
   const rouletteNumbers = [
@@ -167,6 +169,14 @@ export const RouletteGame: React.FC = () => {
     if (totalWin > 0) {
       updateBalance(totalWin);
     }
+
+    // Record game result
+    await recordGameResult('roulette', totalBet, totalWin, selectedCurrency, {
+      number: spinResult,
+      color: resultData?.color,
+      bets: selectedBets,
+      won: hasWon
+    });
 
     setLastWin(hasWon);
     updateStats(totalBet, hasWon);
@@ -453,18 +463,26 @@ export const RouletteGame: React.FC = () => {
             </div>
           </div>
 
-          {/* Recent Numbers */}
+          {/* Recent Games */}
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
             <h3 className="text-xl font-semibold text-white mb-4">Recent Numbers</h3>
             <div className="grid grid-cols-5 gap-2">
-              {gameHistory.map((num, index) => (
-                <div
-                  key={index}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${getNumberColor(num)}`}
-                >
-                  {num}
+              {gameResults.filter(result => result.game_type === 'roulette').slice(0, 10).map((result, index) => {
+                const number = result.game_data?.number || 0;
+                return (
+                  <div
+                    key={result.id || index}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${getNumberColor(number)}`}
+                  >
+                    {number}
+                  </div>
+                );
+              })}
+              {gameResults.filter(result => result.game_type === 'roulette').length === 0 && (
+                <div className="col-span-5 text-center text-gray-400 py-4">
+                  No games played yet
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>

@@ -76,6 +76,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setGameResults(guestResults)
         setLoading(false)
         console.log('Loaded guest profile:', parsedProfile)
+        console.log('Loaded guest game results:', guestResults.length, 'results')
         return
       } catch (error) {
         console.error('Error parsing guest profile:', error)
@@ -192,7 +193,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const loadGameResults = async () => {
-    if (!user || !isSupabaseConfigured) return
+    if (!user) {
+      console.log('No user, skipping game results load')
+      return
+    }
+
+    if (profile?.is_guest) {
+      // Load from localStorage for guests
+      const guestResults = JSON.parse(localStorage.getItem('guestGameResults') || '[]')
+      console.log('Loaded guest game results:', guestResults.length, 'results')
+      setGameResults(guestResults)
+      return
+    }
+
+    if (!isSupabaseConfigured) {
+      console.log('Supabase not configured, skipping game results load')
+      return
+    }
 
     try {
       console.log('Loading game results for user:', user.id)
@@ -201,10 +218,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(50) // Increased limit to show more results
 
       if (!error && data) {
-        console.log('Game results loaded:', data.length, 'results')
+        console.log('Game results loaded from Supabase:', data.length, 'results')
         setGameResults(data)
       } else if (error) {
         console.error('Error loading game results:', error)
@@ -378,7 +395,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         created_at: new Date().toISOString() 
       }
       guestResults.unshift(newResult)
-      guestResults.splice(10) // Keep only last 10
+      guestResults.splice(50) // Keep only last 50
       localStorage.setItem('guestGameResults', JSON.stringify(guestResults))
       setGameResults(guestResults)
       console.log('Guest game result recorded:', newResult)
@@ -393,8 +410,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (!error && data) {
           console.log('Game result recorded in Supabase:', data)
-          // Immediately add to local state
-          setGameResults(prev => [data, ...prev.slice(0, 9)])
+          // Immediately add to local state for instant UI update
+          setGameResults(prev => [data, ...prev.slice(0, 49)])
         } else {
           console.error('Error recording game result:', error)
         }
