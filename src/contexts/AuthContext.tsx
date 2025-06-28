@@ -85,6 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Only try Supabase if it's configured
     if (!isSupabaseConfigured) {
+      console.log('Supabase not configured, running in demo mode')
       setLoading(false)
       return
     }
@@ -97,6 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return
       }
       
+      console.log('Initial session:', session?.user?.id)
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
@@ -136,9 +138,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle() // Use maybeSingle instead of single to avoid errors when no rows
 
-      if (error && error.code === 'PGRST116') {
+      if (!data && !error) {
         // Profile doesn't exist, create one
         console.log('Profile not found, creating new profile')
         const newProfile = {
@@ -163,11 +165,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setProfile(createdProfile)
         } else {
           console.error('Error creating profile:', createError)
+          // If profile creation fails due to duplicate, try to fetch again
+          if (createError?.code === '23505') {
+            const { data: existingProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single()
+            
+            if (existingProfile) {
+              console.log('Found existing profile after duplicate error:', existingProfile)
+              setProfile(existingProfile)
+            }
+          }
         }
       } else if (!error && data) {
         console.log('Profile loaded successfully:', data)
         setProfile(data)
-      } else {
+      } else if (error) {
         console.error('Error loading profile:', error)
       }
     } catch (error) {
@@ -187,6 +202,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .limit(10)
 
       if (!error && data) {
+        console.log('Game results loaded:', data.length)
         setGameResults(data)
       } else if (error) {
         console.error('Error loading game results:', error)
@@ -294,6 +310,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     // Store guest data in localStorage
     localStorage.setItem('guestProfile', JSON.stringify(guestProfile))
+    console.log('Playing as guest:', guestProfile.username)
   }
 
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -304,6 +321,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const updatedProfile = { ...profile, ...updates, updated_at: new Date().toISOString() }
       setProfile(updatedProfile)
       localStorage.setItem('guestProfile', JSON.stringify(updatedProfile))
+      console.log('Guest profile updated:', updatedProfile)
       return { error: null }
     }
 
@@ -319,6 +337,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!error) {
         setProfile(prev => prev ? { ...prev, ...updates, updated_at: new Date().toISOString() } : null)
+        console.log('Profile updated successfully')
+      } else {
+        console.error('Profile update error:', error)
       }
 
       return { error }
@@ -329,7 +350,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const recordGameResult = async (gameType: string, betAmount: number, winAmount: number, currency: string, gameData?: any) => {
-    if (!user || !profile) return
+    if (!user || !profile) {
+      console.log('No user or profile, skipping game result recording')
+      return
+    }
 
     const multiplier = betAmount > 0 ? winAmount / betAmount : 0
     const gameResult = {
@@ -341,6 +365,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       multiplier,
       game_data: gameData || {}
     }
+
+    console.log('Recording game result:', gameResult)
 
     if (profile.is_guest) {
       // Store in localStorage for guests
@@ -354,6 +380,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       guestResults.splice(10) // Keep only last 10
       localStorage.setItem('guestGameResults', JSON.stringify(guestResults))
       setGameResults(guestResults)
+      console.log('Guest game result recorded')
     } else if (isSupabaseConfigured) {
       // Store in Supabase for registered users
       try {
@@ -362,6 +389,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .insert(gameResult)
 
         if (!error) {
+          console.log('Game result recorded in Supabase')
           await loadGameResults()
         } else {
           console.error('Error recording game result:', error)
@@ -378,6 +406,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       games_played: profile.games_played + 1
     }
 
+    console.log('Updating profile stats:', updatedStats)
     await updateProfile(updatedStats)
   }
 

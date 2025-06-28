@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Play } from 'lucide-react';
 import { useWallet } from '../../contexts/WalletContext';
-import { useGame } from '../../contexts/GameContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
 import { AdminButton } from '../AdminButton';
@@ -16,7 +15,6 @@ export const DiceGame: React.FC = () => {
   const [gameHistory, setGameHistory] = useState<Array<{result: number, prediction: string, won: boolean}>>([]);
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
-  const { generateProvablyFairSeed } = useGame();
   const { recordGameResult } = useAuth();
   const { gameSettings } = useAdmin();
 
@@ -46,8 +44,6 @@ export const DiceGame: React.FC = () => {
     setLastWin(null);
     updateBalance(-parseFloat(betAmount));
 
-    // Generate provably fair result
-    generateProvablyFairSeed();
     let roll = Math.floor(Math.random() * 100) + 1;
 
     // Apply admin win rate settings
@@ -85,12 +81,17 @@ export const DiceGame: React.FC = () => {
     }
 
     // Record game result
-    await recordGameResult('dice', parseFloat(betAmount), winAmount, selectedCurrency, {
-      roll,
-      prediction,
-      rollOver,
-      multiplier
-    });
+    try {
+      await recordGameResult('dice', parseFloat(betAmount), winAmount, selectedCurrency, {
+        roll,
+        prediction,
+        rollOver,
+        multiplier,
+        won
+      });
+    } catch (error) {
+      console.error('Error recording game result:', error);
+    }
 
     setGameHistory(prev => [...prev.slice(-9), { result: roll, prediction: `${prediction} ${rollOver}`, won }]);
   };
@@ -107,7 +108,7 @@ export const DiceGame: React.FC = () => {
         {/* Game Controls */}
         <div className="lg:col-span-2 space-y-6">
           {/* Simple Dice Display */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 text-center">
+          <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-2xl p-8 border border-slate-600 text-center">
             <div className="mb-8 h-32 flex items-center justify-center">
               <div className={`w-24 h-24 bg-white rounded-xl border-2 border-gray-300 flex items-center justify-center text-4xl font-bold text-black transition-all duration-300 ${
                 isRolling ? 'animate-bounce' : ''
@@ -132,7 +133,7 @@ export const DiceGame: React.FC = () => {
           </div>
 
           {/* Bet Controls */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -141,7 +142,7 @@ export const DiceGame: React.FC = () => {
                 <select
                   value={selectedCurrency}
                   onChange={(e) => switchCurrency(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-400"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
                 >
                   {currencies.map(currency => (
                     <option key={currency.symbol} value={currency.symbol} className="bg-slate-800">
@@ -159,7 +160,7 @@ export const DiceGame: React.FC = () => {
                   type="number"
                   value={betAmount}
                   onChange={(e) => setBetAmount(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500"
                   placeholder="Enter bet amount"
                   step={selectedCurrency === 'BTC' ? '0.00000001' : selectedCurrency === 'ETH' ? '0.000001' : '0.01'}
                 />
@@ -169,7 +170,7 @@ export const DiceGame: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Prediction
                 </label>
-                <div className="flex rounded-lg bg-white/5 p-1">
+                <div className="flex rounded-lg bg-slate-700 p-1">
                   <button
                     onClick={() => setPrediction('under')}
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
@@ -204,7 +205,7 @@ export const DiceGame: React.FC = () => {
                 max="99"
                 value={rollOver}
                 onChange={(e) => setRollOver(parseInt(e.target.value))}
-                className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
               />
               <div className="flex justify-between text-sm text-gray-400 mt-1">
                 <span>1</span>
@@ -213,11 +214,11 @@ export const DiceGame: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-4 mt-6 text-center">
-              <div className="bg-white/5 rounded-lg p-3">
+              <div className="bg-slate-700 rounded-lg p-3">
                 <div className="text-sm text-gray-400">Win Chance</div>
                 <div className="text-xl font-bold text-white">{winChance.toFixed(1)}%</div>
               </div>
-              <div className="bg-white/5 rounded-lg p-3">
+              <div className="bg-slate-700 rounded-lg p-3">
                 <div className="text-sm text-gray-400">Multiplier</div>
                 <div className="text-xl font-bold text-white">{multiplier.toFixed(2)}x</div>
               </div>
@@ -226,7 +227,7 @@ export const DiceGame: React.FC = () => {
             <button
               onClick={rollDice}
               disabled={isRolling || parseFloat(betAmount) > getBalance() || parseFloat(betAmount) <= 0}
-              className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 rounded-lg transition-all flex items-center justify-center space-x-2 mt-6"
+              className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 rounded-lg transition-all flex items-center justify-center space-x-2 mt-6"
             >
               <Play className="w-5 h-5" />
               <span>{isRolling ? 'Rolling...' : 'Roll Dice'}</span>
@@ -236,7 +237,7 @@ export const DiceGame: React.FC = () => {
 
         {/* Game History */}
         <div className="space-y-6">
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
             <h3 className="text-xl font-semibold text-white mb-4">Game Info</h3>
             <div className="space-y-3">
               <div className="flex justify-between">
@@ -252,7 +253,7 @@ export const DiceGame: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
             <h3 className="text-xl font-semibold text-white mb-4">Recent Games</h3>
             <div className="space-y-2">
               {gameHistory.map((game, index) => (
