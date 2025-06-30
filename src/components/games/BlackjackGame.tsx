@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, RotateCw, Plus, Minus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '../../contexts/WalletContext';
-import { useGame } from '../../contexts/GameContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
 import { AdminButton } from '../AdminButton';
 
@@ -24,7 +24,7 @@ export const BlackjackGame: React.FC = () => {
   const [gameHistory, setGameHistory] = useState<Array<{result: string, playerScore: number, dealerScore: number}>>([]);
   
   const { currencies, selectedCurrency, getBalance, updateBalance, switchCurrency } = useWallet();
-  const { updateStats, generateProvablyFairSeed } = useGame();
+  const { recordGameResult, gameResults } = useAuth();
   const { gameSettings } = useAdmin();
 
   const suits = ['♠', '♥', '♦', '♣'];
@@ -147,7 +147,7 @@ export const BlackjackGame: React.FC = () => {
     }
   };
 
-  const endGame = (gameResult: string) => {
+  const endGame = async (gameResult: string) => {
     setGameState('finished');
     setResult(gameResult);
     
@@ -174,7 +174,15 @@ export const BlackjackGame: React.FC = () => {
       updateBalance(winAmount);
     }
     
-    updateStats(parseFloat(betAmount), won);
+    // Record game result
+    await recordGameResult('blackjack', parseFloat(betAmount), winAmount, selectedCurrency, {
+      playerScore,
+      dealerScore: calculateScore(dealerCards),
+      result: gameResult,
+      playerCards,
+      dealerCards
+    });
+    
     setGameHistory(prev => [...prev.slice(-9), { 
       result: gameResult, 
       playerScore: playerScore, 
@@ -448,28 +456,37 @@ export const BlackjackGame: React.FC = () => {
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
             <h3 className="text-xl font-semibold text-white mb-4">Recent Games</h3>
             <div className="space-y-2">
-              {gameHistory.map((game, index) => (
+              {gameResults.filter(result => result.game_type === 'blackjack').slice(0, 10).map((result, index) => (
                 <div
-                  key={index}
+                  key={result.id || index}
                   className={`flex items-center justify-between p-3 rounded-lg ${
-                    ['win', 'dealer-bust', 'blackjack'].includes(game.result) ? 'bg-green-600/20 border border-green-600/30' : 
-                    game.result === 'push' ? 'bg-yellow-600/20 border border-yellow-600/30' : 
+                    result.win_amount > result.bet_amount ? 'bg-green-600/20 border border-green-600/30' : 
+                    result.win_amount === result.bet_amount ? 'bg-yellow-600/20 border border-yellow-600/30' : 
                     'bg-red-600/20 border border-red-600/30'
                   }`}
                 >
                   <div>
-                    <div className="text-white text-sm font-medium capitalize">{game.result}</div>
-                    <div className="text-gray-400 text-xs">{game.playerScore} vs {game.dealerScore}</div>
+                    <div className="text-white text-sm font-medium capitalize">
+                      {result.game_data?.result || 'blackjack'}
+                    </div>
+                    <div className="text-gray-400 text-xs">
+                      {result.game_data?.playerScore || '?'} vs {result.game_data?.dealerScore || '?'}
+                    </div>
                   </div>
                   <div className={`text-sm font-semibold ${
-                    ['win', 'dealer-bust', 'blackjack'].includes(game.result) ? 'text-green-400' : 
-                    game.result === 'push' ? 'text-yellow-400' : 'text-red-400'
+                    result.win_amount > result.bet_amount ? 'text-green-400' : 
+                    result.win_amount === result.bet_amount ? 'text-yellow-400' : 'text-red-400'
                   }`}>
-                    {['win', 'dealer-bust', 'blackjack'].includes(game.result) ? 'WIN' : 
-                     game.result === 'push' ? 'PUSH' : 'LOSS'}
+                    {result.win_amount > result.bet_amount ? 'WIN' : 
+                     result.win_amount === result.bet_amount ? 'PUSH' : 'LOSS'}
                   </div>
                 </div>
               ))}
+              {gameResults.filter(result => result.game_type === 'blackjack').length === 0 && (
+                <div className="text-center text-gray-400 py-4">
+                  No games played yet
+                </div>
+              )}
             </div>
           </div>
         </div>

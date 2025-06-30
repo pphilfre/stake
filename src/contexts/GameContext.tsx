@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { useAuth } from './AuthContext';
 
 interface GameStats {
   totalGames: number;
@@ -26,6 +27,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     playerLosses: 0
   });
 
+  const { recordGameResult } = useAuth();
+
   const updateStats = (wagered: number, won: boolean) => {
     setGameStats(prev => ({
       ...prev,
@@ -34,6 +37,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       playerWins: won ? prev.playerWins + 1 : prev.playerWins,
       playerLosses: won ? prev.playerLosses : prev.playerLosses + 1
     }));
+
+    // Don't record here - let individual games handle their own recording
+    console.log('Game stats updated:', { wagered, won });
   };
 
   const generateProvablyFairSeed = () => {

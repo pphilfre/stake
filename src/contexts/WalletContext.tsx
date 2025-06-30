@@ -28,104 +28,126 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
   const [currencies, setCurrencies] = useState<Currency[]>([
-    { symbol: 'USD', name: 'US Dollar', balance: 0, usdRate: 1 },
-    { symbol: 'BTC', name: 'Bitcoin', balance: 0, usdRate: 45000 },
-    { symbol: 'ETH', name: 'Ethereum', balance: 0, usdRate: 2500 },
+    { symbol: 'USD', name: 'US Dollar', balance: 1000, usdRate: 1 },
+    { symbol: 'BTC', name: 'Bitcoin', balance: 0.1, usdRate: 45000 },
+    { symbol: 'ETH', name: 'Ethereum', balance: 5, usdRate: 2500 },
   ]);
   const [address, setAddress] = useState('');
+  const [initialized, setInitialized] = useState(false);
 
+  // Load wallet state from localStorage on mount
   useEffect(() => {
-    // Simulate wallet connection persistence
     const savedWallet = localStorage.getItem('wallet');
     if (savedWallet) {
-      const walletData = JSON.parse(savedWallet);
-      setIsConnected(walletData.isConnected);
-      setCurrencies(walletData.currencies || currencies);
-      setSelectedCurrency(walletData.selectedCurrency || 'USD');
-      setAddress(walletData.address);
+      try {
+        const walletData = JSON.parse(savedWallet);
+        console.log('Loading saved wallet data:', walletData);
+        
+        if (walletData.isConnected) {
+          setIsConnected(walletData.isConnected);
+          setCurrencies(walletData.currencies || currencies);
+          setSelectedCurrency(walletData.selectedCurrency || 'USD');
+          setAddress(walletData.address || '');
+          console.log('Wallet state restored from localStorage');
+        }
+      } catch (error) {
+        console.error('Error loading wallet data:', error);
+      }
+    } else {
+      // Auto-connect wallet for demo purposes only if no saved data
+      console.log('No saved wallet data, auto-connecting...');
+      connect();
     }
+    setInitialized(true);
   }, []);
 
+  // Save wallet state to localStorage whenever it changes
+  useEffect(() => {
+    if (initialized && isConnected) {
+      const walletData = {
+        isConnected: true,
+        currencies,
+        selectedCurrency,
+        address
+      };
+      localStorage.setItem('wallet', JSON.stringify(walletData));
+      console.log('Wallet state saved to localStorage:', walletData);
+    }
+  }, [initialized, isConnected, currencies, selectedCurrency, address]);
+
   const connect = () => {
+    // Check if we already have saved data
+    const savedWallet = localStorage.getItem('wallet');
+    if (savedWallet && initialized) {
+      console.log('Wallet already connected, not resetting balances');
+      return;
+    }
+
     // Simulate wallet connection
-    const mockAddress = '0x' + Math.random().toString(16).substr(2, 40);
-    const initialCurrencies = [
-      { symbol: 'USD', name: 'US Dollar', balance: Math.random() * 1000, usdRate: 1 },
-      { symbol: 'BTC', name: 'Bitcoin', balance: Math.random() * 0.1, usdRate: 45000 },
-      { symbol: 'ETH', name: 'Ethereum', balance: Math.random() * 5, usdRate: 2500 },
-    ];
+    const mockAddress = '0x' + Math.random().toString(16).substr(2, 13);
     
     setIsConnected(true);
-    setCurrencies(initialCurrencies);
     setAddress(mockAddress);
     
-    localStorage.setItem('wallet', JSON.stringify({
-      isConnected: true,
-      currencies: initialCurrencies,
-      selectedCurrency,
-      address: mockAddress
-    }));
+    console.log('Wallet connected with address:', mockAddress);
   };
 
   const disconnect = () => {
     setIsConnected(false);
     setCurrencies([
-      { symbol: 'USD', name: 'US Dollar', balance: 0, usdRate: 1 },
-      { symbol: 'BTC', name: 'Bitcoin', balance: 0, usdRate: 45000 },
-      { symbol: 'ETH', name: 'Ethereum', balance: 0, usdRate: 2500 },
+      { symbol: 'USD', name: 'US Dollar', balance: 1000, usdRate: 1 },
+      { symbol: 'BTC', name: 'Bitcoin', balance: 0.1, usdRate: 45000 },
+      { symbol: 'ETH', name: 'Ethereum', balance: 5, usdRate: 2500 },
     ]);
     setAddress('');
     localStorage.removeItem('wallet');
+    console.log('Wallet disconnected and localStorage cleared');
   };
 
   const deposit = (amount: number, currency: string = selectedCurrency) => {
     setCurrencies(prev => prev.map(c => 
       c.symbol === currency ? { ...c, balance: c.balance + amount } : c
     ));
-    updateLocalStorage();
+    console.log(`Deposited ${amount} ${currency}`);
   };
 
   const withdraw = (amount: number, currency: string = selectedCurrency) => {
     const currencyData = currencies.find(c => c.symbol === currency);
     if (currencyData && amount <= currencyData.balance) {
       setCurrencies(prev => prev.map(c => 
-        c.symbol === currency ? { ...c, balance: c.balance - amount } : c
+        c.symbol === currency ? { ...c, balance: Math.max(0, c.balance - amount) } : c
       ));
-      updateLocalStorage();
+      console.log(`Withdrew ${amount} ${currency}`);
+    } else {
+      console.log(`Insufficient balance for withdrawal of ${amount} ${currency}`);
     }
   };
 
   const updateBalance = (amount: number, currency: string = selectedCurrency) => {
-    setCurrencies(prev => prev.map(c => 
-      c.symbol === currency ? { ...c, balance: Math.max(0, c.balance + amount) } : c
-    ));
-    updateLocalStorage();
+    setCurrencies(prev => {
+      const newCurrencies = prev.map(c => 
+        c.symbol === currency ? { ...c, balance: Math.max(0, c.balance + amount) } : c
+      );
+      const newBalance = newCurrencies.find(c => c.symbol === currency)?.balance || 0;
+      console.log(`Updated balance by ${amount} ${currency}. New balance: ${newBalance}`);
+      return newCurrencies;
+    });
   };
 
   const switchCurrency = (currency: string) => {
     setSelectedCurrency(currency);
-    updateLocalStorage();
+    console.log('Switched to currency:', currency);
   };
 
   const getBalance = (currency: string = selectedCurrency) => {
     const currencyData = currencies.find(c => c.symbol === currency);
-    return currencyData?.balance || 0;
+    const balance = currencyData?.balance || 0;
+    return balance;
   };
 
   const convertToUSD = (amount: number, currency: string) => {
     const currencyData = currencies.find(c => c.symbol === currency);
     return currencyData ? amount * currencyData.usdRate : amount;
-  };
-
-  const updateLocalStorage = () => {
-    if (isConnected) {
-      localStorage.setItem('wallet', JSON.stringify({
-        isConnected: true,
-        currencies,
-        selectedCurrency,
-        address
-      }));
-    }
   };
 
   return (
